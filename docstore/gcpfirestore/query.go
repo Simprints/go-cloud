@@ -348,8 +348,8 @@ func newFieldFilter(fp []string, op string, val *pb.Value) (*pb.StructuredQuery_
 	case driver.EqualOp:
 		fop = pb.StructuredQuery_FieldFilter_EQUAL
 	// TODO(jba): can we support array-contains portably?
-	// case "array-contains":
-	// 	fop = pb.StructuredQuery_FieldFilter_ARRAY_CONTAINS
+	case "array-contains":
+		fop = pb.StructuredQuery_FieldFilter_ARRAY_CONTAINS
 	default:
 		return nil, gcerr.Newf(gcerr.InvalidArgument, nil, "invalid operator: %q", op)
 	}

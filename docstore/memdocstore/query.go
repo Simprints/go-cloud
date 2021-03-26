@@ -79,11 +79,32 @@ func filterMatches(f driver.Filter, doc storedDoc) bool {
 	if err != nil {
 		return false
 	}
+	if f.Op == "array-contains" {
+		return applyArrayComparison(docval, f.Value)
+	}
 	c, ok := compare(docval, f.Value)
 	if !ok {
 		return false
 	}
 	return applyComparison(f.Op, c)
+}
+
+func applyArrayComparison(docval, value interface{}) bool {
+	v := reflect.ValueOf(docval)
+	if v.Kind() != reflect.Slice {
+		return false
+	}
+	s := docval.([]interface{})
+	for _, v := range s {
+		c, ok := compare(v, value)
+		if !ok {
+			return false
+		}
+		if c == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // op is one of the five permitted docstore operators ("=", "<", etc.)

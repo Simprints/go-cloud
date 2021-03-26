@@ -37,7 +37,7 @@ func (c *Collection) Query() *Query {
 }
 
 // Where expresses a condition on the query.
-// Valid ops are: "=", ">", "<", ">=", "<=".
+// Valid ops are: "=", ">", "<", ">=", "<=", "array-contains".
 // Valid values are strings, integers, floating-point numbers, and time.Time values.
 func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	if q.err != nil {
@@ -49,7 +49,7 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 		return q
 	}
 	if !validOp[op] {
-		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=", op)
+		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, array-contains", op)
 	}
 	if !validFilterValue(value) {
 		return q.invalidf("invalid filter value: %v", value)
@@ -63,11 +63,12 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 }
 
 var validOp = map[string]bool{
-	"=":  true,
-	">":  true,
-	"<":  true,
-	">=": true,
-	"<=": true,
+	"=":              true,
+	">":              true,
+	"<":              true,
+	">=":             true,
+	"<=":             true,
+	"array-contains": true,
 }
 
 func validFilterValue(v interface{}) bool {

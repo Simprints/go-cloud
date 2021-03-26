@@ -1229,6 +1229,7 @@ type HighScore struct {
 	Player           string
 	Score            int
 	Time             time.Time
+	Tags             []string
 	DocstoreRevision interface{}
 }
 
@@ -1273,14 +1274,14 @@ const (
 )
 
 var highScores = []*HighScore{
-	{game1, "pat", 49, date(3, 13), nil},
-	{game1, "mel", 60, date(4, 10), nil},
-	{game1, "andy", 81, date(2, 1), nil},
-	{game1, "fran", 33, date(3, 19), nil},
-	{game2, "pat", 120, date(4, 1), nil},
-	{game2, "billie", 111, date(4, 10), nil},
-	{game2, "mel", 190, date(4, 18), nil},
-	{game2, "fran", 33, date(3, 20), nil},
+	{game1, "pat", 49, date(3, 13), []string{"tag1"}, nil},
+	{game1, "mel", 60, date(4, 10), []string{"tag2"}, nil},
+	{game1, "andy", 81, date(2, 1), []string{"tag3"}, nil},
+	{game1, "fran", 33, date(3, 19), []string{"tag4"}, nil},
+	{game2, "pat", 120, date(4, 1), []string{"tag2"}, nil},
+	{game2, "billie", 111, date(4, 10), []string{"tag1"}, nil},
+	{game2, "mel", 190, date(4, 18), []string{"tag2"}, nil},
+	{game2, "fran", 33, date(3, 20), []string{"tag1"}, nil},
 }
 
 func addHighScores(t *testing.T, coll *ds.Collection) {
@@ -1453,6 +1454,11 @@ func testGetQuery(t *testing.T, _ Harness, coll *ds.Collection) {
 			want:   func(h *HighScore) bool { return h.Game == game1 },
 			before: func(h1, h2 *HighScore) bool { return h1.Player > h2.Player },
 		},
+		{
+			name: "Tags",
+			q:    coll.Query().Where("Tags", "array-contains", "tag1"),
+			want: func(h *HighScore) bool { return contains(h.Tags, "tag1") },
+		},
 		// TODO(jba): add more OrderBy tests.
 		{
 			name:   "AllWithKeyFields",
@@ -1461,6 +1467,7 @@ func testGetQuery(t *testing.T, _ Harness, coll *ds.Collection) {
 			want: func(h *HighScore) bool {
 				h.Score = 0
 				h.Time = time.Time{}
+				h.Tags = nil
 				return true
 			},
 		},
@@ -1470,6 +1477,7 @@ func testGetQuery(t *testing.T, _ Harness, coll *ds.Collection) {
 			fields: []docstore.FieldPath{"Game", "Player", "Score", ds.FieldPath(ds.DefaultRevisionField)},
 			want: func(h *HighScore) bool {
 				h.Time = time.Time{}
+				h.Tags = nil
 				return true
 			},
 		},
@@ -1530,6 +1538,15 @@ func filterHighScores(hs []*HighScore, f func(*HighScore) bool) []*HighScore {
 		}
 	}
 	return res
+}
+
+func contains(s []string, v string) bool {
+	for _, s2 := range s {
+		if s2 == v {
+			return true
+		}
+	}
+	return false
 }
 
 // clearCollection delete all documents from this collection after test.
@@ -1933,7 +1950,7 @@ func testAs(t *testing.T, coll *ds.Collection, st AsTest) {
 	}
 
 	// ErrorCheck
-	doc := &HighScore{game3, "steph", 24, date(4, 25), nil}
+	doc := &HighScore{game3, "steph", 24, date(4, 25), nil, nil}
 	if err := coll.Create(ctx, doc); err != nil {
 		t.Fatal(err)
 	}
