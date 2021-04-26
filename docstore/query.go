@@ -37,7 +37,7 @@ func (c *Collection) Query() *Query {
 }
 
 // Where expresses a condition on the query.
-// Valid ops are: "=", ">", "<", ">=", "<=", "array-contains".
+// Valid ops are: "=", ">", "<", ">=", "<=", "array-contains", "array-contains-any".
 // Valid values are strings, integers, floating-point numbers, and time.Time values.
 func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	if q.err != nil {
@@ -49,7 +49,7 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 		return q
 	}
 	if !validOp[op] {
-		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, array-contains", op)
+		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, array-contains, array-contains-any", op)
 	}
 	if !validFilterValue(value) {
 		return q.invalidf("invalid filter value: %v", value)
@@ -63,12 +63,13 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 }
 
 var validOp = map[string]bool{
-	"=":              true,
-	">":              true,
-	"<":              true,
-	">=":             true,
-	"<=":             true,
-	"array-contains": true,
+	"=":                  true,
+	">":                  true,
+	"<":                  true,
+	">=":                 true,
+	"<=":                 true,
+	"array-contains":     true,
+	"array-contains-any": true,
 }
 
 func validFilterValue(v interface{}) bool {
@@ -86,6 +87,8 @@ func validFilterValue(v interface{}) bool {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return true
 	case reflect.Float32, reflect.Float64:
+		return true
+	case reflect.Slice:
 		return true
 	default:
 		return false

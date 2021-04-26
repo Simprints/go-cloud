@@ -82,6 +82,19 @@ func filterMatches(f driver.Filter, doc storedDoc) bool {
 	if f.Op == "array-contains" {
 		return applyArrayComparison(docval, f.Value)
 	}
+	if f.Op == "array-contains-any" {
+		value := reflect.ValueOf(f.Value)
+		if value.Kind() != reflect.Slice {
+			return false
+		}
+
+		for i := 0; i < value.Len(); i++ {
+			if applyArrayComparison(docval, value.Index(i).Interface()) {
+				return true
+			}
+		}
+		return false
+	}
 	c, ok := compare(docval, f.Value)
 	if !ok {
 		return false

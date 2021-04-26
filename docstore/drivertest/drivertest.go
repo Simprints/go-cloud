@@ -1459,6 +1459,11 @@ func testGetQuery(t *testing.T, _ Harness, coll *ds.Collection) {
 			q:    coll.Query().Where("Tags", "array-contains", "tag1"),
 			want: func(h *HighScore) bool { return contains(h.Tags, "tag1") },
 		},
+		{
+			name: "Tags array-contains-any",
+			q:    coll.Query().Where("Tags", "array-contains-any", []string{"tag1", "tag2"}),
+			want: func(h *HighScore) bool { return contains(h.Tags, "tag1") || contains(h.Tags, "tag2") },
+		},
 		// TODO(jba): add more OrderBy tests.
 		{
 			name:   "AllWithKeyFields",
