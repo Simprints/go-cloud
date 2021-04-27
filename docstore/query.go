@@ -38,7 +38,7 @@ func (c *Collection) Query() *Query {
 
 // Where expresses a condition on the query.
 // Valid ops are: "=", ">", "<", ">=", "<=", "array-contains", "array-contains-any".
-// Valid values are strings, integers, floating-point numbers, and time.Time values.
+// Valid values are strings, integers, floating-point numbers, boolean (only with "="), slice (only with "array-contains-any") and time.Time values.
 func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	if q.err != nil {
 		return q
@@ -51,8 +51,8 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	if !validOp[op] {
 		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, array-contains, array-contains-any", op)
 	}
-	if !validFilterValue(value) {
-		return q.invalidf("invalid filter value: %v", value)
+	if !validFilterValue(op, value) {
+		return q.invalidf("invalid filter value: %v for operator %q", value, op)
 	}
 	q.dq.Filters = append(q.dq.Filters, driver.Filter{
 		FieldPath: pfp,
@@ -72,14 +72,18 @@ var validOp = map[string]bool{
 	"array-contains-any": true,
 }
 
-func validFilterValue(v interface{}) bool {
+func validFilterValue(op string, v interface{}) bool {
 	if v == nil {
 		return false
 	}
 	if _, ok := v.(time.Time); ok {
 		return true
 	}
-	switch reflect.TypeOf(v).Kind() {
+	k := reflect.TypeOf(v).Kind()
+	if op == "array-contains-any" {
+		return k == reflect.Slice
+	}
+	switch k {
 	case reflect.String:
 		return true
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -88,8 +92,8 @@ func validFilterValue(v interface{}) bool {
 		return true
 	case reflect.Float32, reflect.Float64:
 		return true
-	case reflect.Slice:
-		return true
+	case reflect.Bool:
+		return op == "="
 	default:
 		return false
 	}
