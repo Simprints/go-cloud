@@ -259,7 +259,7 @@ func splitFilters(fs []driver.Filter) (sendToFirestore, evaluateLocally []driver
 	// Enforce that only one field can have an inequality.
 	var rangeFP []string
 	for _, f := range fs {
-		if f.Op == driver.EqualOp {
+		if f.Op == driver.EqualOp || f.Op == "array-contains" || f.Op == "array-contains-any" {
 			sendToFirestore = append(sendToFirestore, f)
 		} else {
 			if rangeFP == nil || driver.FieldPathsEqual(rangeFP, f.FieldPath) {
