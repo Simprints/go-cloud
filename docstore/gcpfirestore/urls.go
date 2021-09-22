@@ -19,12 +19,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"sync"
 
 	vkit "cloud.google.com/go/firestore/apiv1"
 	"gocloud.dev/docstore"
 	"gocloud.dev/gcp"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 func init() {
@@ -39,12 +42,23 @@ type lazyCredsOpener struct {
 
 func (o *lazyCredsOpener) OpenCollectionURL(ctx context.Context, u *url.URL) (*docstore.Collection, error) {
 	o.init.Do(func() {
-		creds, err := gcp.DefaultCredentials(ctx)
-		if err != nil {
-			o.err = err
-			return
+		var options []option.ClientOption
+		if addr := os.Getenv("FIRESTORE_EMULATOR_HOST"); addr != "" {
+			conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithPerRPCCredentials(emulatorCreds{}))
+			if err != nil {
+				o.err = fmt.Errorf("firestore: dialing address from env var FIRESTORE_EMULATOR_HOST: %s", err)
+				return
+			}
+			options = []option.ClientOption{option.WithGRPCConn(conn)}
+		} else {
+			creds, err := gcp.DefaultCredentials(ctx)
+			if err != nil {
+				o.err = err
+				return
+			}
+			options = []option.ClientOption{option.WithTokenSource(creds.TokenSource)}
 		}
-		client, _, err := Dial(ctx, creds.TokenSource)
+		client, _, err := Dial(ctx, options...)
 		if err != nil {
 			o.err = err
 			return
@@ -96,4 +110,17 @@ func (o *URLOpener) OpenCollectionURL(ctx context.Context, u *url.URL) (*docstor
 	}
 	collResourceID := path.Join(u.Host, u.Path)
 	return OpenCollection(o.Client, collResourceID, nameField, options)
+}
+
+// emulatorCreds is an instance of grpc.PerRPCCredentials that will configure a
+// client to act as an admin for the Firestore emulator. It always hardcodes
+// the "authorization" metadata field to contain "Bearer owner", which the
+// Firestore emulator accepts as valid admin credentials.
+type emulatorCreds struct{}
+
+func (ec emulatorCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{"authorization": "Bearer owner"}, nil
+}
+func (ec emulatorCreds) RequireTransportSecurity() bool {
+	return false
 }

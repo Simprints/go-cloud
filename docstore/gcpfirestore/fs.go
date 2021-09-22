@@ -81,7 +81,6 @@ import (
 	"gocloud.dev/docstore"
 	"gocloud.dev/docstore/driver"
 	"gocloud.dev/gcerrors"
-	"gocloud.dev/gcp"
 	"gocloud.dev/internal/gcerr"
 	"gocloud.dev/internal/useragent"
 	"google.golang.org/api/option"
@@ -92,8 +91,9 @@ import (
 
 // Dial returns a client to use with Firestore and a clean-up function to close
 // the client after used.
-func Dial(ctx context.Context, ts gcp.TokenSource) (*vkit.Client, func(), error) {
-	c, err := vkit.NewClient(ctx, option.WithTokenSource(ts), useragent.ClientOption("docstore"))
+func Dial(ctx context.Context, opts ...option.ClientOption) (*vkit.Client, func(), error) {
+	options := append(opts, useragent.ClientOption("docstore"))
+	c, err := vkit.NewClient(ctx, options...)
 	return c, func() { c.Close() }, err
 }
 

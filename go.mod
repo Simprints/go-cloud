@@ -17,10 +17,15 @@ module gocloud.dev
 go 1.12
 
 require (
-	cloud.google.com/go v0.72.0
-	cloud.google.com/go/firestore v1.4.0
-	cloud.google.com/go/pubsub v1.9.0
-	cloud.google.com/go/storage v1.12.0
+	cloud.google.com/go v0.94.0
+	cloud.google.com/go/container v0.1.0 // indirect
+	cloud.google.com/go/firestore v1.5.0
+	cloud.google.com/go/kms v0.1.0
+	cloud.google.com/go/monitoring v0.2.0 // indirect
+	cloud.google.com/go/pubsub v1.16.0
+	cloud.google.com/go/secretmanager v0.1.0
+	cloud.google.com/go/storage v1.16.1
+	cloud.google.com/go/trace v0.1.0 // indirect
 	contrib.go.opencensus.io/exporter/aws v0.0.0-20200617204711-c478e41e60e9
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.4
 	contrib.go.opencensus.io/integrations/ocsql v0.1.7
@@ -39,27 +44,25 @@ require (
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.5.4
+	github.com/golang/protobuf v1.5.2
+	github.com/google/go-cmp v0.5.6
 	github.com/google/go-replayers/grpcreplay v1.0.0
 	github.com/google/go-replayers/httpreplay v0.1.2
 	github.com/google/martian v2.1.1-0.20190517191504-25dcb96d9e51+incompatible // indirect
 	github.com/google/uuid v1.1.2
 	github.com/google/wire v0.5.0
-	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/googleapis/gax-go/v2 v2.1.0
 	github.com/klauspost/compress v1.11.3 // indirect
 	github.com/lib/pq v1.9.0
 	github.com/mitchellh/mapstructure v1.4.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
-	go.opencensus.io v0.22.5
+	go.opencensus.io v0.23.0
 	golang.org/x/crypto v0.0.0-20201203163018-be400aefbc4c
-	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
-	golang.org/x/oauth2 v0.0.0-20201203001011-0b49973bad19
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	golang.org/x/sys v0.0.0-20201202213521-69691e467435 // indirect
-	golang.org/x/tools v0.0.0-20201203202102-a1a1cbeaa516 // indirect
+	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-	google.golang.org/api v0.36.0
-	google.golang.org/genproto v0.0.0-20201203001206-6486ece9c497
-	google.golang.org/grpc v1.34.0
+	google.golang.org/api v0.55.0
+	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
+	google.golang.org/grpc v1.40.0
 )
