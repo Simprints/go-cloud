@@ -17,8 +17,7 @@ module gocloud.dev/docstore/mongodocstore
 go 1.12
 
 require (
-	github.com/golang/snappy v0.0.2 // indirect
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.6
 	github.com/google/wire v0.5.0
 	github.com/xdg/stringprep v1.0.0 // indirect
 	go.mongodb.org/mongo-driver v1.4.4

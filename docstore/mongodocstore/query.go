@@ -70,11 +70,12 @@ func (c *collection) RunGetQuery(ctx context.Context, q *driver.Query) (driver.D
 }
 
 var mongoQueryOps = map[string]string{
-	driver.EqualOp: "$eq",
-	">":            "$gt",
-	">=":           "$gte",
-	"<":            "$lt",
-	"<=":           "$lte",
+	driver.EqualOp:       "$eq",
+	">":                  "$gt",
+	">=":                 "$gte",
+	"<":                  "$lt",
+	"<=":                 "$lte",
+	"array-contains-any": "$in",
 }
 
 // filtersToBSON converts a []driver.Filter to the MongoDB equivalent, expressed
