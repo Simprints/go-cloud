@@ -219,7 +219,7 @@ type Query struct {
 // TODO(#1762): support comparison of other types.
 type Filter struct {
 	FieldPath []string    // the field path to filter
-	Op        string      // the operation, supports `=`, `>`, `>=`, `<`, `<=`, `in`, `not-in`
+	Op        string      // the operation, supports `=`, `>`, `>=`, `<`, `<=`, `in`, `not-in`, `array-contains`
 	Value     interface{} // the value to compare using the operation
 }
 

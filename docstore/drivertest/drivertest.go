@@ -1272,6 +1272,7 @@ type HighScore struct {
 	Player           string
 	Score            int
 	Time             time.Time
+	GameCategories   []string
 	DocstoreRevision interface{}
 }
 
@@ -1315,15 +1316,21 @@ const (
 	game3 = "Days Gone"
 )
 
+var (
+	game1Category = []string{"Action", "Adventure"}
+	game2Category = []string{"Horror", "Comedy"}
+	game3Category = []string{"Action", "Adventure", "Horror"}
+)
+
 var highScores = []*HighScore{
-	{game1, "pat", 49, date(3, 13), nil},
-	{game1, "mel", 60, date(4, 10), nil},
-	{game1, "andy", 81, date(2, 1), nil},
-	{game1, "fran", 33, date(3, 19), nil},
-	{game2, "pat", 120, date(4, 1), nil},
-	{game2, "billie", 111, date(4, 10), nil},
-	{game2, "mel", 190, date(4, 18), nil},
-	{game2, "fran", 33, date(3, 20), nil},
+	{game1, "pat", 49, date(3, 13), game1Category, nil},
+	{game1, "mel", 60, date(4, 10), game1Category, nil},
+	{game1, "andy", 81, date(2, 1), game1Category, nil},
+	{game1, "fran", 33, date(3, 19), game1Category, nil},
+	{game2, "pat", 120, date(4, 1), game2Category, nil},
+	{game2, "billie", 111, date(4, 10), game2Category, nil},
+	{game2, "mel", 190, date(4, 18), game2Category, nil},
+	{game2, "fran", 33, date(3, 20), game2Category, nil},
 }
 
 func addHighScores(t *testing.T, coll *docstore.Collection) {
@@ -1486,6 +1493,11 @@ func testGetQuery(t *testing.T, _ Harness, coll *docstore.Collection) {
 			want: func(h *HighScore) bool { return h.Player != "pat" && h.Player != "billie" },
 		},
 		{
+			name: "GameCategories",
+			q:    coll.Query().Where("GameCategories", "array-contains", game1Category[0]),
+			want: func(h *HighScore) bool { return arrayContains(h.GameCategories, game1Category[0]) },
+		},
+		{
 			name:   "AllByPlayerAsc",
 			q:      coll.Query().OrderBy("Player", docstore.Ascending),
 			want:   func(h *HighScore) bool { return true },
@@ -1522,13 +1534,14 @@ func testGetQuery(t *testing.T, _ Harness, coll *docstore.Collection) {
 			want: func(h *HighScore) bool {
 				h.Score = 0
 				h.Time = time.Time{}
+				h.GameCategories = nil
 				return true
 			},
 		},
 		{
 			name:   "AllWithScore",
 			q:      coll.Query(),
-			fields: []docstore.FieldPath{"Game", "Player", "Score", docstore.FieldPath(docstore.DefaultRevisionField)},
+			fields: []docstore.FieldPath{"Game", "Player", "Score", "GameCategories", docstore.FieldPath(docstore.DefaultRevisionField)},
 			want: func(h *HighScore) bool {
 				h.Time = time.Time{}
 				return true
@@ -2118,7 +2131,7 @@ func testAs(t *testing.T, coll *docstore.Collection, st AsTest) {
 	}
 
 	// ErrorCheck
-	doc := &HighScore{game3, "steph", 24, date(4, 25), nil}
+	doc := &HighScore{game3, "steph", 24, date(4, 25), game3Category, nil}
 	if err := coll.Create(ctx, doc); err != nil {
 		t.Fatal(err)
 	}
@@ -2156,4 +2169,13 @@ func checkCode(t *testing.T, err error, code gcerrors.ErrorCode) {
 	if gcerrors.Code(err) != code {
 		t.Errorf("got %v, want %s", err, code)
 	}
+}
+
+func arrayContains[T comparable](a []T, x T) bool {
+	for _, e := range a {
+		if e == x {
+			return true
+		}
+	}
+	return false
 }

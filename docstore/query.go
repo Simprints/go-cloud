@@ -37,7 +37,7 @@ func (c *Collection) Query() *Query {
 }
 
 // Where expresses a condition on the query.
-// Valid ops are: "=", ">", "<", ">=", "<=, "in", "not-in".
+// Valid ops are: "=", ">", "<", ">=", "<=, "in", "not-in", "array-contains".
 // Valid values are strings, integers, floating-point numbers, and time.Time values.
 func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	if q.err != nil {
@@ -50,7 +50,7 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 	}
 	validator, ok := validOp[op]
 	if !ok {
-		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, in, not-in", op)
+		return q.invalidf("invalid filter operator: %q. Use one of: =, >, <, >=, <=, in, not-in, array-contains", op)
 	}
 	if !validator(value) {
 		return q.invalidf("invalid filter value: %v", value)
@@ -66,13 +66,14 @@ func (q *Query) Where(fp FieldPath, op string, value interface{}) *Query {
 type valueValidator func(interface{}) bool
 
 var validOp = map[string]valueValidator{
-	"=":      validFilterValue,
-	">":      validFilterValue,
-	"<":      validFilterValue,
-	">=":     validFilterValue,
-	"<=":     validFilterValue,
-	"in":     validFilterSlice,
-	"not-in": validFilterSlice,
+	"=":              validFilterValue,
+	">":              validFilterValue,
+	"<":              validFilterValue,
+	">=":             validFilterValue,
+	"<=":             validFilterValue,
+	"array-contains": validFilterValue,
+	"in":             validFilterSlice,
+	"not-in":         validFilterSlice,
 }
 
 func validFilterValue(v interface{}) bool {
