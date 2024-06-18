@@ -274,7 +274,7 @@ func splitFilters(fs []driver.Filter) (sendToFirestore, evaluateLocally []driver
 	// Enforce that only one field can have an inequality.
 	var rangeFP []string
 	for _, f := range fs {
-		if f.Op == driver.EqualOp {
+		if f.Op == driver.EqualOp || f.Op == "array-contains" {
 			sendToFirestore = append(sendToFirestore, f)
 		} else {
 			if rangeFP == nil || driver.FieldPathsEqual(rangeFP, f.FieldPath) {
@@ -366,9 +366,8 @@ func newFieldFilter(fp []string, op string, val *pb.Value) (*pb.StructuredQuery_
 		fop = pb.StructuredQuery_FieldFilter_IN
 	case "not-in":
 		fop = pb.StructuredQuery_FieldFilter_NOT_IN
-	// TODO(jba): can we support array-contains portably?
-	// case "array-contains":
-	// 	fop = pb.StructuredQuery_FieldFilter_ARRAY_CONTAINS
+	case "array-contains":
+		fop = pb.StructuredQuery_FieldFilter_ARRAY_CONTAINS
 	default:
 		return nil, gcerr.Newf(gcerr.InvalidArgument, nil, "invalid operator: %q", op)
 	}
