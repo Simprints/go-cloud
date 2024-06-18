@@ -1324,14 +1324,14 @@ var (
 )
 
 var highScores = []*HighScore{
-	{game1, "pat", 49, date(3, 13), game1Category, nil},
-	{game1, "mel", 60, date(4, 10), game1Category, nil},
-	{game1, "andy", 81, date(2, 1), game1Category, nil},
-	{game1, "fran", 33, date(3, 19), game1Category, nil},
-	{game2, "pat", 120, date(4, 1), game2Category, nil},
-	{game2, "billie", 111, date(4, 10), game2Category, nil},
-	{game2, "mel", 190, date(4, 18), game2Category, nil},
-	{game2, "fran", 33, date(3, 20), game2Category, nil},
+	{game1, "pat", 49, date(3, 13), false, game1Category, nil},
+	{game1, "mel", 60, date(4, 10), false, game1Category, nil},
+	{game1, "andy", 81, date(2, 1), false, game1Category, nil},
+	{game1, "fran", 33, date(3, 19), false, game1Category, nil},
+	{game2, "pat", 120, date(4, 1), true, game2Category, nil},
+	{game2, "billie", 111, date(4, 10), false, game2Category, nil},
+	{game2, "mel", 190, date(4, 18), true, game2Category, nil},
+	{game2, "fran", 33, date(3, 20), false, game2Category, nil},
 }
 
 func addHighScores(t *testing.T, coll *docstore.Collection) {
@@ -2138,7 +2138,7 @@ func testAs(t *testing.T, coll *docstore.Collection, st AsTest) {
 	}
 
 	// ErrorCheck
-	doc := &HighScore{game3, "steph", 24, date(4, 25), game3Category, nil}
+	doc := &HighScore{game3, "steph", 24, date(4, 25), false, game3Category, nil}
 	if err := coll.Create(ctx, doc); err != nil {
 		t.Fatal(err)
 	}
