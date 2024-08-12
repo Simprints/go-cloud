@@ -1499,6 +1499,16 @@ func testGetQuery(t *testing.T, _ Harness, coll *docstore.Collection) {
 			want: func(h *HighScore) bool { return h.WithGlitch },
 		},
 		{
+			name: "WithGlitchIn",
+			q:    coll.Query().Where("WithGlitch", "in", []bool{true}),
+			want: func(h *HighScore) bool { return h.WithGlitch },
+		},
+		{
+			name: "WithGlitchNotIn",
+			q:    coll.Query().Where("WithGlitch", "not-in", []bool{true}),
+			want: func(h *HighScore) bool { return !h.WithGlitch },
+		},
+		{
 			name: "GameCategories",
 			q:    coll.Query().Where("GameCategories", "array-contains", game1Category[0]),
 			want: func(h *HighScore) bool { return arrayContains(h.GameCategories, game1Category[0]) },

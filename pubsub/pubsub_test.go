@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -279,6 +280,48 @@ func TestCancelTwoReceives(t *testing.T) {
 	if err != context.DeadlineExceeded {
 		t.Errorf("got %v, want context.DeadlineExceeded", err)
 	}
+}
+
+type secondReceiveBlockedDriverSub struct {
+	driver.Subscription
+	receiveCounter atomic.Uint64
+}
+
+func (s *secondReceiveBlockedDriverSub) ReceiveBatch(ctx context.Context, _ int) ([]*driver.Message, error) {
+	// The first request will return a message right away.
+	// The second one will block ~forever.
+	if n := s.receiveCounter.Add(1); n > 1 {
+		<-ctx.Done()
+	}
+	msg := &driver.Message{Body: []byte(fmt.Sprintf("message #%d", s.receiveCounter.Load()))}
+	return []*driver.Message{msg}, nil
+}
+func (*secondReceiveBlockedDriverSub) CanNack() bool                                      { return false }
+func (*secondReceiveBlockedDriverSub) SendAcks(_ context.Context, _ []driver.AckID) error { return nil }
+func (*secondReceiveBlockedDriverSub) IsRetryable(error) bool                             { return false }
+func (*secondReceiveBlockedDriverSub) Close() error                                       { return nil }
+
+// TestIndependentBatchReturn verifies that when multiple batch requests are sent,
+// as long as one of them succeeds it should not block Subscription.Receive.
+func TestIndependentBatchReturn(t *testing.T) {
+	s := NewSubscription(
+		&secondReceiveBlockedDriverSub{},
+		&batcher.Options{MaxBatchSize: 1, MaxHandlers: 2}, // force 2 batches by allowing 2 handlers and 1 msg per batch
+		nil,
+	)
+	ctx := context.Background()
+	defer s.Shutdown(ctx)
+
+	// Set the batch size to force 2 batches to be called.
+	s.runningBatchSize = 2
+	ctxTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	m, err := s.Receive(ctxTimeout)
+	if err != nil {
+		t.Fatal("Receive should not fail", err)
+		return
+	}
+	m.Ack()
 }
 
 func TestRetryTopic(t *testing.T) {
