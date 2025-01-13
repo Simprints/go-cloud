@@ -48,7 +48,7 @@ import (
 //
 //	name from the Terraform output instead (saving a copy of it for replay).
 const (
-	bucketName = "go-cloud-testing"
+	bucketName = "go-cloud-testing-2"
 	region     = "us-west-1"
 )
 
@@ -178,7 +178,7 @@ func (v verifyContentLanguage) ErrorCheck(b *blob.Bucket, err error) error {
 	return nil
 }
 
-func (v verifyContentLanguage) BeforeRead(as func(interface{}) bool) error {
+func (v verifyContentLanguage) BeforeRead(as func(any) bool) error {
 	if v.useV2 {
 		var (
 			req  *s3v2.GetObjectInput
@@ -196,7 +196,7 @@ func (v verifyContentLanguage) BeforeRead(as func(interface{}) bool) error {
 	return nil
 }
 
-func (v verifyContentLanguage) BeforeWrite(as func(interface{}) bool) error {
+func (v verifyContentLanguage) BeforeWrite(as func(any) bool) error {
 	if v.useV2 {
 		var (
 			req      *s3v2.PutObjectInput
@@ -224,7 +224,7 @@ func (v verifyContentLanguage) BeforeWrite(as func(interface{}) bool) error {
 	return nil
 }
 
-func (v verifyContentLanguage) BeforeCopy(as func(interface{}) bool) error {
+func (v verifyContentLanguage) BeforeCopy(as func(any) bool) error {
 	if v.useV2 {
 		var in *s3v2.CopyObjectInput
 		if !as(&in) {
@@ -239,7 +239,7 @@ func (v verifyContentLanguage) BeforeCopy(as func(interface{}) bool) error {
 	return nil
 }
 
-func (v verifyContentLanguage) BeforeList(as func(interface{}) bool) error {
+func (v verifyContentLanguage) BeforeList(as func(any) bool) error {
 	if v.useV2 {
 		if v.usingLegacyList {
 			var req *s3v2.ListObjectsInput
@@ -272,7 +272,7 @@ func (v verifyContentLanguage) BeforeList(as func(interface{}) bool) error {
 	return nil
 }
 
-func (v verifyContentLanguage) BeforeSign(as func(interface{}) bool) error {
+func (v verifyContentLanguage) BeforeSign(as func(any) bool) error {
 	if v.useV2 {
 		var (
 			get *s3v2.GetObjectInput
@@ -469,17 +469,49 @@ func TestOpenBucketFromURL(t *testing.T) {
 		// OK, setting region.
 		{"s3://mybucket?region=us-west1", false},
 		// OK, setting profile.
-		{"s3://mybucket?profile=main", false},
+		{"s3://mybucket?awssdk=v1&profile=main", false},
 		// OK, setting both profile and region.
-		{"s3://mybucket?profile=main&region=us-west-1", false},
+		{"s3://mybucket?awssdk=v1&profile=main&region=us-west-1", false},
 		// OK, use V2.
 		{"s3://mybucket?awssdk=v2", false},
 		// OK, use KMS Server Side Encryption
 		{"s3://mybucket?ssetype=aws:kms&kmskeyid=arn:aws:us-east-1:12345:key/1-a-2-b", false},
+		// OK, use S3 Transfer acceleration and dual stack endpoints
+		{"s3://mybucket?accelerate=true&dualstack=true", false},
+		// OK, use FIPS endpoints
+		{"s3://mybucket?fips=true", false},
+		// OK, use S3 Transfer accleration and dual stack endpoints (v1)
+		{"s3://mybucket?awssdk=v1&accelerate=true&dualstack=true", false},
+		// OK, use use_path_style
+		{"s3://mybucket?use_path_style=true", false},
+		// OK, use s3ForcePathStyle
+		{"s3://mybucket?s3ForcePathStyle=true", false},
+		// OK, use disable_https
+		{"s3://mybucket?disable_https=true", false},
+		// OK, use FIPS endpoints (v1)
+		{"s3://mybucket?awssdk=v1&fips=true", false},
+		// OK, use anonymous.
+		{"s3://mybucket?awssdk=v2&anonymous=true", false},
+		// Invalid accelerate (v1)
+		{"s3://mybucket?awssdk=v1&accelerate=bogus", true},
+		// Invalid accelerate (v2)
+		{"s3://mybucket?accelerate=bogus", true},
+		// Invalid FIPS (v1)
+		{"s3://mybucket?awssdk=v1&fips=bogus", true},
+		// Invalid FIPS (v2)
+		{"s3://mybucket?fips=bogus", true},
+		// Invalid dualstack (v1)
+		{"s3://mybucket?awssdk=v1&dualstack=bad", true},
+		// Invalid dualstack (v2)
+		{"s3://mybucket?dualstack=bad", true},
 		// Invalid ssetype
 		{"s3://mybucket?ssetype=aws:notkmsoraes&kmskeyid=arn:aws:us-east-1:12345:key/1-a-2-b", true},
 		// Invalid parameter together with a valid one.
 		{"s3://mybucket?profile=main&param=value", true},
+		// Invalid use_path_style (v1)
+		{"s3://mybucket?awssdk=v1&usePathStyle=bad", true},
+		// Invalid disable_https (v2)
+		{"s3://mybucket?usePathStyle=bad", true},
 		// Invalid parameter.
 		{"s3://mybucket?param=value", true},
 	}

@@ -179,6 +179,8 @@ type Options struct {
 // Parameter Store returns raw bytes; provide a decoder to decode the raw bytes
 // into the appropriate type for runtimevar.Snapshot.Value.
 // See the runtimevar package documentation for examples of decoders.
+//
+// Deprecated: AWS no longer supports their V1 API. Please migrate to OpenVariableV2.
 func OpenVariable(sess client.ConfigProvider, name string, decoder *runtimevar.Decoder, opts *Options) (*runtimevar.Variable, error) {
 	return runtimevar.New(newWatcher(false, sess, nil, name, decoder, opts)), nil
 }
@@ -208,7 +210,7 @@ func newWatcher(useV2 bool, sess client.ConfigProvider, clientV2 *ssmv2.Client, 
 
 // state implements driver.State.
 type state struct {
-	val        interface{}
+	val        any
 	rawGetV1   *ssm.GetParameterOutput
 	rawGetV2   *ssmv2.GetParameterOutput
 	updateTime time.Time
@@ -217,7 +219,7 @@ type state struct {
 }
 
 // Value implements driver.State.Value.
-func (s *state) Value() (interface{}, error) {
+func (s *state) Value() (any, error) {
 	return s.val, s.err
 }
 
@@ -227,7 +229,7 @@ func (s *state) UpdateTime() time.Time {
 }
 
 // As implements driver.State.As.
-func (s *state) As(i interface{}) bool {
+func (s *state) As(i any) bool {
 	switch p := i.(type) {
 	case **ssm.GetParameterOutput:
 		*p = s.rawGetV1
@@ -373,7 +375,7 @@ func (w *watcher) Close() error {
 }
 
 // ErrorAs implements driver.ErrorAs.
-func (w *watcher) ErrorAs(err error, i interface{}) bool {
+func (w *watcher) ErrorAs(err error, i any) bool {
 	if w.useV2 {
 		return errors.As(err, i)
 	}
