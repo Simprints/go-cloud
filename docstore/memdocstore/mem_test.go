@@ -16,8 +16,10 @@ package memdocstore
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -47,12 +49,14 @@ func (h *harness) MakeCollection(_ context.Context, kind drivertest.CollectionKi
 	}
 }
 
-func (*harness) BeforeDoTypes() []interface{}    { return nil }
-func (*harness) BeforeQueryTypes() []interface{} { return nil }
+func (*harness) BeforeDoTypes() []any    { return nil }
+func (*harness) BeforeQueryTypes() []any { return nil }
 
-func (*harness) RevisionsEqual(rev1, rev2 interface{}) bool { return rev1 == rev2 }
+func (*harness) RevisionsEqual(rev1, rev2 any) bool { return rev1 == rev2 }
 
-func (*harness) SupportsAtomicWrites() bool { return false }
+func (*harness) AtomicWritesKind() drivertest.AtomicWritesSupportKind {
+	return drivertest.MultiplePartitions
+}
 
 func (*harness) Close() {}
 
@@ -61,7 +65,7 @@ func TestConformance(t *testing.T) {
 	drivertest.RunConformanceTests(t, newHarness, nil, nil)
 }
 
-type docmap = map[string]interface{}
+type docmap = map[string]any
 
 // memdocstore-specific tests.
 
@@ -131,6 +135,142 @@ func TestUpdateAtomic(t *testing.T) {
 	}
 }
 
+func TestQueryNested(t *testing.T) {
+	ctx := context.Background()
+
+	dc, err := newCollection(drivertest.KeyField, nil, &Options{AllowNestedSliceQueries: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coll := docstore.NewCollection(dc)
+	defer coll.Close()
+
+	// Set up test documents
+	testDocs := []docmap{{
+		drivertest.KeyField: "TestQueryNested",
+		"list":              []any{docmap{"a": "A"}},
+		"map":               docmap{"b": "B"},
+		"listOfMaps":        []any{docmap{"id": "1"}, docmap{"id": "2"}, docmap{"id": "3"}},
+		"mapOfLists":        docmap{"ids": []any{"1", "2", "3"}},
+		"deep":              []any{docmap{"nesting": []any{docmap{"of": docmap{"elements": "yes"}}}}},
+		"listOfLists":       []any{docmap{"items": []any{docmap{"price": 10}, docmap{"price": 20}}}},
+		dc.RevisionField():  nil,
+	}, {
+		drivertest.KeyField: "CheapItems",
+		"items":             []any{docmap{"price": 10}, docmap{"price": 1}},
+		dc.RevisionField():  nil,
+	}, {
+		drivertest.KeyField: "ExpensiveItems",
+		"items":             []any{docmap{"price": 50}, docmap{"price": 100}},
+		dc.RevisionField():  nil,
+	}}
+
+	for _, testDoc := range testDocs {
+		err = coll.Put(ctx, testDoc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name     string
+		where    []any
+		wantKeys []string
+	}{
+		{
+			name:     "list field match",
+			where:    []any{"list.a", "=", "A"},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:  "list field no match",
+			where: []any{"list.a", "=", "missing"},
+		}, {
+			name:     "map field match",
+			where:    []any{"map.b", "=", "B"},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "list of maps field match",
+			where:    []any{"listOfMaps.id", "=", "2"},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "map of lists field match",
+			where:    []any{"mapOfLists.ids", "=", "1"},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "deep nested field match",
+			where:    []any{"deep.nesting.of.elements", "=", "yes"},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "list of lists exact price 10",
+			where:    []any{"listOfLists.items.price", "=", 10},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "list of lists exact price 20",
+			where:    []any{"listOfLists.items.price", "=", 20},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "list of lists price less than or equal to 20",
+			where:    []any{"listOfLists.items.price", "<=", 20},
+			wantKeys: []string{"TestQueryNested"},
+		}, {
+			name:     "items price equals 1",
+			where:    []any{"items.price", "=", 1},
+			wantKeys: []string{"CheapItems"},
+		}, {
+			name:  "items price equals 5 (no match)",
+			where: []any{"items.price", "=", 5},
+		}, {
+			name:     "items price greater than or equal to 1",
+			where:    []any{"items.price", ">=", 1},
+			wantKeys: []string{"CheapItems", "ExpensiveItems"},
+		}, {
+			name:     "items price greater than or equal to 5",
+			where:    []any{"items.price", ">=", 5},
+			wantKeys: []string{"CheapItems", "ExpensiveItems"},
+		}, {
+			name:     "items price greater than or equal to 10",
+			where:    []any{"items.price", ">=", 10},
+			wantKeys: []string{"CheapItems", "ExpensiveItems"},
+		}, {
+			name:     "items price less than or equal to 50",
+			where:    []any{"items.price", "<=", 50},
+			wantKeys: []string{"CheapItems", "ExpensiveItems"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			iter := coll.Query().Where(docstore.FieldPath(tc.where[0].(string)), tc.where[1].(string), tc.where[2]).Get(ctx)
+			var got []docmap
+			for {
+				doc := docmap{}
+				err := iter.Next(ctx, doc)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					t.Fatal(err)
+				}
+				got = append(got, doc)
+			}
+
+			// Extract keys from results
+			var gotKeys []string
+			for _, d := range got {
+				if key, ok := d[drivertest.KeyField].(string); ok {
+					gotKeys = append(gotKeys, key)
+				}
+			}
+			slices.Sort(gotKeys)
+
+			diff := cmp.Diff(gotKeys, tc.wantKeys)
+			if diff != "" {
+				t.Errorf("query results mismatch (-got +want):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSortDocs(t *testing.T) {
 	newDocs := func() []storedDoc {
 		return []storedDoc{
@@ -180,7 +320,7 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 
 	// Save some data into the file.
-	docs := map[interface{}]storedDoc{
+	docs := map[any]storedDoc{
 		"k1": {"key": "k1", "a": 1},
 		"k2": {"key": "k2", "b": 2},
 	}

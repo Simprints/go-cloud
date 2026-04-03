@@ -678,6 +678,10 @@ func TestOpenBucketFromURL(t *testing.T) {
 		{"gs://mybucket?private_key_path=" + pkFile.Name(), false},
 		// OK, clearing any pre-existing private key.
 		{"gs://mybucket?private_key_path=", false},
+		// OK, setting universe_domain.
+		{"gs://mybucket?universe_domain=example.com", false},
+		// OK, universe_domain with empty value.
+		{"gs://mybucket?universe_domain=", false},
 		// Invalid private_key_path.
 		{"gs://mybucket?private_key_path=invalid-path", true},
 		// Invalid parameter.

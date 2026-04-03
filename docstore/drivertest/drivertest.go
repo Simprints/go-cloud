@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"reflect"
 	"strings"
@@ -61,6 +62,19 @@ const (
 	NoRev
 )
 
+// AtomicWritesSupportKind describes the kind of atomic writes test to run.
+type AtomicWritesSupportKind int
+
+const (
+	// collection does not support atomic writes
+	NoSupport AtomicWritesSupportKind = iota
+	// collection supports atomic writes within a single partition
+	SinglePartition
+	// collection supports atomic writes across multiple partitions as well as
+	// within a single partition
+	MultiplePartitions
+)
+
 // Harness descibes the functionality test harnesses must provide to run
 // conformance tests.
 type Harness interface {
@@ -72,17 +86,17 @@ type Harness interface {
 	// to *GetRequests and write actions to *WriteRequests, then BeforeDoTypes should
 	// return []interface{}{&GetRequest{}, &WriteRequest{}}.
 	// TODO(jba): consider splitting these by action kind.
-	BeforeDoTypes() []interface{}
+	BeforeDoTypes() []any
 
 	// BeforeQueryTypes should return a list of values whose types are valid for the as
 	// function given to BeforeQuery.
-	BeforeQueryTypes() []interface{}
+	BeforeQueryTypes() []any
 
 	// RevisionsEqual reports whether two revisions are equal.
-	RevisionsEqual(rev1, rev2 interface{}) bool
+	RevisionsEqual(rev1, rev2 any) bool
 
-	// SupportsAtomicWrites should report if a collection supports atomic writes
-	SupportsAtomicWrites() bool
+	// AtomicWritesKind should report if a collection supports atomic writes
+	AtomicWritesKind() AtomicWritesSupportKind
 
 	// Close closes resources used by the harness.
 	Close()
@@ -117,10 +131,10 @@ const (
 // docstore codec for a driver, and that driver's own "native" codec.
 type CodecTester interface {
 	UnsupportedTypes() []UnsupportedType
-	NativeEncode(interface{}) (interface{}, error)
-	NativeDecode(value, dest interface{}) error
-	DocstoreEncode(interface{}) (interface{}, error)
-	DocstoreDecode(value, dest interface{}) error
+	NativeEncode(any) (any, error)
+	NativeDecode(value, dest any) error
+	DocstoreEncode(any) (any, error)
+	DocstoreDecode(value, dest any) error
 }
 
 // AsTest represents a test of As functionality.
@@ -176,6 +190,8 @@ func RunConformanceTests(t *testing.T, newHarness HarnessMaker, ct CodecTester, 
 	t.Run("Create", func(t *testing.T) { withRevCollections(t, newHarness, testCreate) })
 	t.Run("AtomicWrites", func(t *testing.T) { withRevCollections(t, newHarness, testAtomicWrites) })
 	t.Run("AtomicWritesFail", func(t *testing.T) { withRevCollections(t, newHarness, testAtomicWritesFail) })
+	t.Run("AtomicWritesSinglePartition", func(t *testing.T) { withCollection(t, newHarness, TwoKey, testAtomicWritesSinglePartition) })
+	t.Run("AtomicWritesFailSinglePartition", func(t *testing.T) { withCollection(t, newHarness, TwoKey, testAtomicWritesFailSinglePartition) })
 	t.Run("Put", func(t *testing.T) { withRevCollections(t, newHarness, testPut) })
 	t.Run("Replace", func(t *testing.T) { withRevCollections(t, newHarness, testReplace) })
 	t.Run("Get", func(t *testing.T) { withRevCollections(t, newHarness, testGet) })
@@ -225,6 +241,10 @@ func withCollection(t *testing.T, newHarness HarnessMaker, kind CollectionKind, 
 	}
 	defer h.Close()
 
+	if strings.Contains(t.Name(), "AtomicWrites") && h.AtomicWritesKind() < SinglePartition {
+		t.Skip()
+	}
+
 	withColl(t, h, kind, f)
 }
 
@@ -240,7 +260,7 @@ func withRevCollections(t *testing.T, newHarness HarnessMaker, f func(*testing.T
 		t.Fatal(err)
 	}
 	defer h.Close()
-	if strings.Contains(t.Name(), "AtomicWrites") && !h.SupportsAtomicWrites() {
+	if strings.Contains(t.Name(), "AtomicWrites") && h.AtomicWritesKind() < MultiplePartitions {
 		t.Skip()
 	}
 
@@ -283,9 +303,9 @@ const KeyField = "name"
 // name for the revision field.
 const AlternateRevisionField = "Etag"
 
-type docmap = map[string]interface{}
+type docmap = map[string]any
 
-func newDoc(doc interface{}) interface{} {
+func newDoc(doc any) any {
 	switch v := doc.(type) {
 	case docmap:
 		return docmap{KeyField: v[KeyField]}
@@ -295,7 +315,7 @@ func newDoc(doc interface{}) interface{} {
 	return nil
 }
 
-func key(doc interface{}) interface{} {
+func key(doc any) any {
 	switch d := doc.(type) {
 	case docmap:
 		return d[KeyField]
@@ -305,7 +325,7 @@ func key(doc interface{}) interface{} {
 	return nil
 }
 
-func setKey(doc, key interface{}) {
+func setKey(doc, key any) {
 	switch d := doc.(type) {
 	case docmap:
 		d[KeyField] = key
@@ -314,7 +334,7 @@ func setKey(doc, key interface{}) {
 	}
 }
 
-func revision(doc interface{}, revField string) interface{} {
+func revision(doc any, revField string) any {
 	switch d := doc.(type) {
 	case docmap:
 		return d[revField]
@@ -327,7 +347,7 @@ func revision(doc interface{}, revField string) interface{} {
 	return nil
 }
 
-func setRevision(doc, rev interface{}, revField string) {
+func setRevision(doc, rev any, revField string) {
 	switch d := doc.(type) {
 	case docmap:
 		d[revField] = rev
@@ -341,16 +361,16 @@ func setRevision(doc, rev interface{}, revField string) {
 }
 
 type docstruct struct {
-	Name             interface{} `docstore:"name"`
-	DocstoreRevision interface{}
-	Etag             interface{}
+	Name             any `docstore:"name"`
+	DocstoreRevision any
+	Etag             any
 
 	I  int
 	U  uint
 	F  float64
 	St string
 	B  bool
-	M  map[string]interface{}
+	M  map[string]any
 }
 
 func nonexistentDoc() docmap { return docmap{KeyField: "doesNotExist"} }
@@ -361,7 +381,7 @@ func testCreate(t *testing.T, coll *docstore.Collection, revField string) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name    string
-		doc     interface{}
+		doc     any
 		wantErr gcerrors.ErrorCode
 	}{
 		{
@@ -428,11 +448,11 @@ func testPut(t *testing.T, coll *docstore.Collection, revField string) {
 			t.Fatal(err)
 		}
 	}
-	var maprev, strmap interface{}
+	var maprev, strmap any
 
 	for _, tc := range []struct {
 		name string
-		doc  interface{}
+		doc  any
 		rev  bool
 	}{
 		{
@@ -482,7 +502,7 @@ func testPut(t *testing.T, coll *docstore.Collection, revField string) {
 	// it will fail if the document doesn't exist.
 	for _, tc := range []struct {
 		name string
-		doc  interface{}
+		doc  any
 	}{
 		{
 			name: "replace map wrong key",
@@ -502,7 +522,7 @@ func testPut(t *testing.T, coll *docstore.Collection, revField string) {
 	}
 
 	t.Run("revision", func(t *testing.T) {
-		testRevisionField(t, coll, revField, func(doc interface{}) error {
+		testRevisionField(t, coll, revField, func(doc any) error {
 			return coll.Put(ctx, doc)
 		})
 	})
@@ -524,7 +544,7 @@ func testReplace(t *testing.T, coll *docstore.Collection, revField string) {
 
 	for _, tc := range []struct {
 		name       string
-		doc1, doc2 interface{}
+		doc1, doc2 any
 	}{
 		{
 			name: "replace map",
@@ -554,14 +574,14 @@ func testReplace(t *testing.T, coll *docstore.Collection, revField string) {
 	checkCode(t, coll.Replace(ctx, nonexistentDoc()), gcerrors.NotFound)
 
 	t.Run("revision", func(t *testing.T) {
-		testRevisionField(t, coll, revField, func(doc interface{}) error {
+		testRevisionField(t, coll, revField, func(doc any) error {
 			return coll.Replace(ctx, doc)
 		})
 	})
 }
 
 // Check that doc does not have a revision field (or has a nil one).
-func checkNoRevisionField(t *testing.T, doc interface{}, revField string) {
+func checkNoRevisionField(t *testing.T, doc any, revField string) {
 	t.Helper()
 	ddoc, err := driver.NewDocument(doc)
 	if err != nil {
@@ -573,7 +593,7 @@ func checkNoRevisionField(t *testing.T, doc interface{}, revField string) {
 }
 
 // Check that doc has a non-nil revision field.
-func checkHasRevisionField(t *testing.T, doc interface{}, revField string) {
+func checkHasRevisionField(t *testing.T, doc any, revField string) {
 	t.Helper()
 
 	ddoc, err := driver.NewDocument(doc)
@@ -598,9 +618,9 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 
 	for _, tc := range []struct {
 		name string
-		doc  interface{}
+		doc  any
 		fps  []docstore.FieldPath
-		want interface{}
+		want any
 	}{
 		// If Get is called with no field paths, the full document is populated.
 		{
@@ -610,7 +630,7 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 				"s":      "a string",
 				"i":      int64(95),
 				"f":      32.3,
-				"m":      map[string]interface{}{"a": "one", "b": "two"},
+				"m":      map[string]any{"a": "one", "b": "two"},
 				revField: nil,
 			},
 		},
@@ -621,7 +641,7 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 				St:   "a string",
 				I:    95,
 				F:    32.3,
-				M:    map[string]interface{}{"a": "one", "b": "two"},
+				M:    map[string]any{"a": "one", "b": "two"},
 			},
 		},
 		// If Get is called with field paths, the resulting document has only those fields.
@@ -632,14 +652,14 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 				"s":      "a string",
 				"i":      int64(95),
 				"f":      32.3,
-				"m":      map[string]interface{}{"a": "one", "b": "two"},
+				"m":      map[string]any{"a": "one", "b": "two"},
 				revField: nil,
 			},
 			fps: []docstore.FieldPath{"f", "m.b", docstore.FieldPath(revField)},
 			want: docmap{
 				KeyField: "testGetMapFP",
 				"f":      32.3,
-				"m":      map[string]interface{}{"b": "two"},
+				"m":      map[string]any{"b": "two"},
 			},
 		},
 		{
@@ -649,13 +669,13 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 				St:   "a string",
 				I:    95,
 				F:    32.3,
-				M:    map[string]interface{}{"a": "one", "b": "two"},
+				M:    map[string]any{"a": "one", "b": "two"},
 			},
 			fps: []docstore.FieldPath{"St", "M.a", docstore.FieldPath(revField)},
 			want: &docstruct{
 				Name: "testGetStructFP",
 				St:   "a string",
-				M:    map[string]interface{}{"a": "one"},
+				M:    map[string]any{"a": "one"},
 			},
 		},
 		{
@@ -665,7 +685,7 @@ func testGet(t *testing.T, coll *docstore.Collection, revField string) {
 				St:   "a string",
 				I:    95,
 				F:    32.3,
-				M:    map[string]interface{}{"a": "one", "b": "two"},
+				M:    map[string]any{"a": "one", "b": "two"},
 			},
 			fps: []docstore.FieldPath{"st", "m.a"},
 			want: &docstruct{
@@ -698,11 +718,11 @@ func testDelete(t *testing.T, coll *docstore.Collection, revField string) {
 	t.Helper()
 
 	ctx := context.Background()
-	var rev interface{}
+	var rev any
 
 	for _, tc := range []struct {
 		name    string
-		doc     interface{}
+		doc     any
 		wantErr gcerrors.ErrorCode
 	}{
 		{
@@ -758,9 +778,9 @@ func testUpdate(t *testing.T, coll *docstore.Collection, revField string) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name string
-		doc  interface{}
+		doc  any
 		mods docstore.Mods
-		want interface{}
+		want any
 	}{
 		{
 			name: "update map",
@@ -855,7 +875,7 @@ func testUpdate(t *testing.T, coll *docstore.Collection, revField string) {
 	checkCode(t, err, gcerrors.InvalidArgument)
 
 	t.Run("revision", func(t *testing.T) {
-		testRevisionField(t, coll, revField, func(doc interface{}) error {
+		testRevisionField(t, coll, revField, func(doc any) error {
 			return coll.Update(ctx, doc, docstore.Mods{"s": "c"})
 		})
 	})
@@ -864,7 +884,7 @@ func testUpdate(t *testing.T, coll *docstore.Collection, revField string) {
 // Test that:
 // - Writing a document with a revision field succeeds if the document hasn't changed.
 // - Writing a document with a revision field fails if the document has changed.
-func testRevisionField(t *testing.T, coll *docstore.Collection, revField string, write func(interface{}) error) {
+func testRevisionField(t *testing.T, coll *docstore.Collection, revField string, write func(any) error) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -876,7 +896,7 @@ func testRevisionField(t *testing.T, coll *docstore.Collection, revField string,
 	}
 	for _, tc := range []struct {
 		name string
-		doc  interface{}
+		doc  any
 	}{
 		{
 			name: "map revision",
@@ -940,7 +960,7 @@ func testData(t *testing.T, _ Harness, coll *docstore.Collection) {
 
 	ctx := context.Background()
 	for _, test := range []struct {
-		in, want interface{}
+		in, want any
 	}{
 		{int(-1), int64(-1)},
 		{int8(-8), int64(-8)},
@@ -990,7 +1010,7 @@ func testTypeDrivenDecode(t *testing.T, ct CodecTester) {
 	if ct == nil {
 		t.Skip("no CodecTester")
 	}
-	check := func(in, dec interface{}, encode func(interface{}) (interface{}, error), decode func(interface{}, interface{}) error) {
+	check := func(in, dec any, encode func(any) (any, error), decode func(any, any) error) {
 		t.Helper()
 		enc, err := encode(in)
 		if err != nil {
@@ -1080,7 +1100,7 @@ func testTypeDrivenDecode(t *testing.T, ct CodecTester) {
 	nt := &NT{nanoTime}
 	if unsupported[NanosecondTimes] {
 		// Expect rounding to the nearest millisecond.
-		check := func(encode func(interface{}) (interface{}, error), decode func(interface{}, interface{}) error) {
+		check := func(encode func(any) (any, error), decode func(any, any) error) {
 			enc, err := encode(nt)
 			if err != nil {
 				t.Fatalf("%+v", err)
@@ -1128,16 +1148,16 @@ func testBlindDecode(t *testing.T, ct CodecTester) {
 	t.Run("NativeEncode", func(t *testing.T) { testBlindDecode1(t, ct.NativeEncode, ct.DocstoreDecode) })
 }
 
-func testBlindDecode1(t *testing.T, encode func(interface{}) (interface{}, error), decode func(_, _ interface{}) error) {
+func testBlindDecode1(t *testing.T, encode func(any) (any, error), decode func(_, _ any) error) {
 	t.Helper()
 
 	// Encode and decode expect a document, so use this struct to hold the values.
-	type S struct{ X interface{} }
+	type S struct{ X any }
 
 	for _, test := range []struct {
-		in    interface{} // the value to be encoded
-		want  interface{} // one possibility
-		want2 interface{} // a second possibility
+		in    any // the value to be encoded
+		want  any // one possibility
+		want2 any // a second possibility
 	}{
 		{in: nil, want: nil},
 		{in: true, want: true},
@@ -1152,23 +1172,23 @@ func testBlindDecode1(t *testing.T, encode func(interface{}) (interface{}, error
 		{in: []byte{1, 2}, want: []byte{1, 2}},
 		{
 			in:    []int{1, 2},
-			want:  []interface{}{int32(1), int32(2)},
-			want2: []interface{}{int64(1), int64(2)},
+			want:  []any{int32(1), int32(2)},
+			want2: []any{int64(1), int64(2)},
 		},
-		{in: []float32{1.5, 2.5}, want: []interface{}{float64(1.5), float64(2.5)}},
-		{in: []float64{1.5, 2.5}, want: []interface{}{float64(1.5), float64(2.5)}},
+		{in: []float32{1.5, 2.5}, want: []any{float64(1.5), float64(2.5)}},
+		{in: []float64{1.5, 2.5}, want: []any{float64(1.5), float64(2.5)}},
 		{in: milliTime, want: milliTime, want2: "2019-03-27T00:00:00.005Z"},
 		{
 			in:    []time.Time{milliTime},
-			want:  []interface{}{milliTime},
-			want2: []interface{}{"2019-03-27T00:00:00.005Z"},
+			want:  []any{milliTime},
+			want2: []any{"2019-03-27T00:00:00.005Z"},
 		},
 		{
 			in:    map[string]int{"a": 1},
-			want:  map[string]interface{}{"a": int64(1)},
-			want2: map[string]interface{}{"a": int32(1)},
+			want:  map[string]any{"a": int64(1)},
+			want2: map[string]any{"a": int32(1)},
 		},
-		{in: map[string][]byte{"a": {1, 2}}, want: map[string]interface{}{"a": []byte{1, 2}}},
+		{in: map[string][]byte{"a": {1, 2}}, want: map[string]any{"a": []byte{1, 2}}},
 	} {
 		enc, err := encode(&S{test.in})
 		if err != nil {
@@ -1179,7 +1199,7 @@ func testBlindDecode1(t *testing.T, encode func(interface{}) (interface{}, error
 			t.Fatalf("decoding %T: %v", test.in, err)
 		}
 		matched := false
-		wants := []interface{}{test.want}
+		wants := []any{test.want}
 		if test.want2 != nil {
 			wants = append(wants, test.want2)
 		}
@@ -1247,7 +1267,7 @@ func testProto(t *testing.T, _ Harness, coll *docstore.Collection) {
 		Name             string `docstore:"name"`
 		Proto            tspb.Timestamp
 		PtrToProto       *tspb.Timestamp
-		DocstoreRevision interface{}
+		DocstoreRevision any
 	}
 	doc := &protoStruct{
 		Name:       "testing",
@@ -1283,18 +1303,18 @@ type HighScore struct {
 	Time             time.Time
 	WithGlitch       bool
 	GameCategories   []string
-	DocstoreRevision interface{}
+	DocstoreRevision any
 }
 
-func newHighScore() interface{} { return &HighScore{} }
+func newHighScore() any { return &HighScore{} }
 
 // HighScoreKey constructs a single primary key from a HighScore struct or a map
 // with the same fields by concatenating the Game and Player fields.
-func HighScoreKey(doc docstore.Document) interface{} {
+func HighScoreKey(doc docstore.Document) any {
 	switch d := doc.(type) {
 	case *HighScore:
 		return d.key()
-	case map[string]interface{}:
+	case map[string]any:
 		return barConcat(d["Game"], d["Player"])
 	default:
 		panic("bad arg")
@@ -1308,7 +1328,7 @@ func (h *HighScore) key() string {
 	return barConcat(h.Game, h.Player)
 }
 
-func barConcat(a, b interface{}) string { return fmt.Sprintf("%v|%v", a, b) }
+func barConcat(a, b any) string { return fmt.Sprintf("%v|%v", a, b) }
 
 func highScoreLess(h1, h2 *HighScore) bool { return h1.key() < h2.key() }
 
@@ -1733,7 +1753,7 @@ func filterHighScores(hs []*HighScore, f func(*HighScore) bool) []*HighScore {
 // ClearCollection delete all documents from this collection after test.
 func ClearCollection(fataler interface {
 	Helper()
-	Fatalf(string, ...interface{})
+	Fatalf(string, ...any)
 }, coll *docstore.Collection,
 ) {
 	fataler.Helper()
@@ -1742,7 +1762,7 @@ func ClearCollection(fataler interface {
 	iter := coll.Query().Get(ctx)
 	dels := coll.Actions()
 	for {
-		doc := map[string]interface{}{}
+		doc := map[string]any{}
 		err := iter.Next(ctx, doc)
 		if err == io.EOF {
 			break
@@ -1757,7 +1777,7 @@ func ClearCollection(fataler interface {
 	}
 }
 
-func forEach(ctx context.Context, iter *docstore.DocumentIterator, create func() interface{}, handle func(interface{}) error) error {
+func forEach(ctx context.Context, iter *docstore.DocumentIterator, create func() any, handle func(any) error) error {
 	for {
 		doc := create()
 		err := iter.Next(ctx, doc)
@@ -1778,8 +1798,8 @@ func mustCollect(ctx context.Context, t *testing.T, iter *docstore.DocumentItera
 	t.Helper()
 
 	var ms []docmap
-	newDocmap := func() interface{} { return docmap{} }
-	collect := func(m interface{}) error { ms = append(ms, m.(docmap)); return nil }
+	newDocmap := func() any { return docmap{} }
+	collect := func(m any) error { ms = append(ms, m.(docmap)); return nil }
 	if err := forEach(ctx, iter, newDocmap, collect); err != nil {
 		t.Fatal(err)
 	}
@@ -1798,7 +1818,7 @@ func mustCollectHighScores(ctx context.Context, t *testing.T, iter *docstore.Doc
 
 func collectHighScores(ctx context.Context, iter *docstore.DocumentIterator) ([]*HighScore, error) {
 	var hs []*HighScore
-	collect := func(h interface{}) error { hs = append(hs, h.(*HighScore)); return nil }
+	collect := func(h any) error { hs = append(hs, h.(*HighScore)); return nil }
 	if err := forEach(ctx, iter, newHighScore, collect); err != nil {
 		return nil, err
 	}
@@ -1818,7 +1838,7 @@ func testMultipleActions(t *testing.T, coll *docstore.Collection, revField strin
 	}
 
 	var docs []docmap
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		docs = append(docs, docmap{
 			KeyField: fmt.Sprintf("testUnorderedActions%d", i),
 			"s":      fmt.Sprint(i),
@@ -1828,7 +1848,7 @@ func testMultipleActions(t *testing.T, coll *docstore.Collection, revField strin
 
 	compare := func(gots, wants []docmap) {
 		t.Helper()
-		for i := 0; i < len(gots); i++ {
+		for i := range gots {
 			got := gots[i]
 			want := clone(wants[i])
 			want[revField] = got[revField]
@@ -1840,14 +1860,14 @@ func testMultipleActions(t *testing.T, coll *docstore.Collection, revField strin
 
 	// Put the first three docs.
 	actions := coll.Actions()
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		actions.Create(docs[i])
 	}
 	must(actions.Do(ctx))
 
 	// Replace the first three and put six more.
 	actions = coll.Actions()
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		docs[i]["s"] = fmt.Sprintf("%d'", i)
 		actions.Replace(docs[i])
 	}
@@ -1935,7 +1955,7 @@ func testAtomicWrites(t *testing.T, coll *docstore.Collection, revField string) 
 	}
 
 	var docs []docmap
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		docs = append(docs, docmap{
 			KeyField: fmt.Sprintf("testAtomicWrites%d", i),
 			"s":      fmt.Sprint(i),
@@ -1945,7 +1965,7 @@ func testAtomicWrites(t *testing.T, coll *docstore.Collection, revField string) 
 
 	compare := func(gots, wants []docmap) {
 		t.Helper()
-		for i := 0; i < len(gots); i++ {
+		for i := range gots {
 			got := gots[i]
 			want := clone(wants[i])
 			want[revField] = got[revField]
@@ -1957,7 +1977,7 @@ func testAtomicWrites(t *testing.T, coll *docstore.Collection, revField string) 
 
 	// Put the nine docs.
 	actions := coll.Actions()
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		actions.Create(docs[i])
 	}
 	must(actions.Do(ctx))
@@ -2018,7 +2038,7 @@ func testAtomicWritesFail(t *testing.T, coll *docstore.Collection, revField stri
 	}
 
 	var docs []docmap
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		docs = append(docs, docmap{
 			KeyField: fmt.Sprintf("testAtomicWrites%d", i),
 			"s":      fmt.Sprint(i),
@@ -2028,7 +2048,7 @@ func testAtomicWritesFail(t *testing.T, coll *docstore.Collection, revField stri
 
 	compare := func(gots, wants []docmap) {
 		t.Helper()
-		for i := 0; i < len(gots); i++ {
+		for i := range gots {
 			got := gots[i]
 			want := clone(wants[i])
 			want[revField] = got[revField]
@@ -2040,7 +2060,7 @@ func testAtomicWritesFail(t *testing.T, coll *docstore.Collection, revField stri
 
 	// Put the first eight docs.
 	actions := coll.Actions()
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		actions.Create(docs[i])
 	}
 	must(actions.Do(ctx))
@@ -2084,6 +2104,180 @@ func testAtomicWritesFail(t *testing.T, coll *docstore.Collection, revField stri
 	}
 }
 
+// Same scenario as testAtomicWrites but with composite ID
+func testAtomicWritesSinglePartition(t *testing.T, h Harness, coll *docstore.Collection) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	revField := "DocstoreRevision"
+	partitionKey := "Game"
+	partitionKeyValue := "testAtomicWrites"
+	pk2 := "Player"
+
+	var docs []docmap
+	for i := 0; i < 9; i++ {
+		docs = append(docs, docmap{
+			partitionKey: partitionKeyValue,
+			pk2:          fmt.Sprintf("testAtomicWrites%d", i),
+			"s":          fmt.Sprint(i),
+			revField:     nil,
+		})
+	}
+
+	compare := func(gots, wants []docmap) {
+		t.Helper()
+		for i := 0; i < len(gots); i++ {
+			got := gots[i]
+			want := clone(wants[i])
+			want[revField] = got[revField]
+			if !cmp.Equal(got, want, cmpopts.IgnoreUnexported(tspb.Timestamp{})) {
+				t.Errorf("index #%d:\ngot  %v\nwant %v", i, got, want)
+			}
+		}
+	}
+
+	// Put the nine docs.
+	actions := coll.Actions()
+	for i := 0; i < 9; i++ {
+		actions.Create(docs[i])
+	}
+	must(actions.Do(ctx))
+
+	// Delete the first three, get the second three, and update last three in transaction.
+	gdocs := []docmap{
+		{partitionKey: partitionKeyValue, pk2: docs[3][pk2]},
+		{partitionKey: partitionKeyValue, pk2: docs[4][pk2]},
+		{partitionKey: partitionKeyValue, pk2: docs[5][pk2]},
+	}
+	actions = coll.Actions()
+	actions.Get(gdocs[0])
+	actions.Delete(docs[0])
+	actions.Delete(docs[1])
+	actions.Get(gdocs[1])
+	actions.Delete(docs[2])
+	actions.Get(gdocs[2])
+	actions.AtomicWrites()
+	actions.Update(docs[6], docstore.Mods{"s": "66"})
+	actions.Update(docs[7], docstore.Mods{"s": "77"})
+	actions.Update(docs[8], docstore.Mods{"s": "88"})
+
+	must(actions.Do(ctx))
+	compare(gdocs, docs[3:6])
+
+	// Get the docs updated as part of atomic writes and verify that the values were updated successfully.
+	doc := docmap{partitionKey: partitionKeyValue, pk2: docs[6][pk2]}
+	_ = coll.Get(ctx, doc)
+	if diff := cmpDiff("66", doc["s"]); diff != "" {
+		t.Fatal(diff)
+	}
+
+	doc = docmap{partitionKey: partitionKeyValue, pk2: docs[7][pk2]}
+	_ = coll.Get(ctx, doc)
+	if diff := cmpDiff("77", doc["s"]); diff != "" {
+		t.Fatal(diff)
+	}
+
+	doc = docmap{partitionKey: partitionKeyValue, pk2: docs[8][pk2]}
+	_ = coll.Get(ctx, doc)
+	if diff := cmpDiff("88", doc["s"]); diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+// Same scenario as testAtomicWritesFail but with composite ID
+func testAtomicWritesFailSinglePartition(t *testing.T, h Harness, coll *docstore.Collection) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	revField := "DocstoreRevision"
+	partitionKey := "Game"
+	partitionKeyValue := "testAtomicWrites"
+	pk2 := "Player"
+
+	var docs []docmap
+	for i := 0; i < 9; i++ {
+		docs = append(docs, docmap{
+			partitionKey: partitionKeyValue,
+			pk2:          fmt.Sprintf("testAtomicWrites%d", i),
+			"s":          fmt.Sprint(i),
+			revField:     nil,
+		})
+	}
+
+	compare := func(gots, wants []docmap) {
+		t.Helper()
+		for i := 0; i < len(gots); i++ {
+			got := gots[i]
+			want := clone(wants[i])
+			want[revField] = got[revField]
+			if !cmp.Equal(got, want, cmpopts.IgnoreUnexported(tspb.Timestamp{})) {
+				t.Errorf("index #%d:\ngot  %v\nwant %v", i, got, want)
+			}
+		}
+	}
+
+	// Put the first eight docs.
+	actions := coll.Actions()
+	for i := 0; i < 8; i++ {
+		actions.Create(docs[i])
+	}
+	must(actions.Do(ctx))
+
+	// Delete the first three, get the second three, and update last three in transaction.
+	gdocs := []docmap{
+		{partitionKey: partitionKeyValue, pk2: docs[3][pk2]},
+		{partitionKey: partitionKeyValue, pk2: docs[4][pk2]},
+		{partitionKey: partitionKeyValue, pk2: docs[5][pk2]},
+	}
+	actions = coll.Actions()
+	actions.Get(gdocs[0])
+	actions.Delete(docs[0])
+	actions.Delete(docs[1])
+	actions.Get(gdocs[1])
+	actions.Delete(docs[2])
+	actions.Get(gdocs[2])
+	actions.AtomicWrites()
+	actions.Update(docs[6], docstore.Mods{"s": "66"})
+	actions.Update(docs[7], docstore.Mods{"s": "77"})
+	// this document doesn't exist so it will fail the transaction
+	actions.Update(docs[8], docstore.Mods{"s": "88"})
+
+	err := actions.Do(ctx)
+	if err == nil {
+		t.Fatal("want transaction to fail")
+	}
+	compare(gdocs, docs[3:6])
+
+	// validate that the values still remains the original
+	doc := docmap{partitionKey: partitionKeyValue, pk2: docs[6][pk2]}
+	_ = coll.Get(ctx, doc)
+	if diff := cmpDiff("6", doc["s"]); diff != "" {
+		t.Fatal(diff)
+	}
+
+	doc = docmap{partitionKey: partitionKeyValue, pk2: docs[7][pk2]}
+	_ = coll.Get(ctx, doc)
+	if diff := cmpDiff("7", doc["s"]); diff != "" {
+		t.Fatal(diff)
+	}
+}
+
 func testActionsOnStructNoRev(t *testing.T, _ Harness, coll *docstore.Collection) {
 	t.Helper()
 
@@ -2096,7 +2290,7 @@ func testActionsOnStructNoRev(t *testing.T, _ Harness, coll *docstore.Collection
 	ctx := context.Background()
 
 	got1 := item{Name: doc1.Name}
-	got2 := map[string]interface{}{"name": doc2.Name}
+	got2 := map[string]any{"name": doc2.Name}
 	if err := coll.Actions().
 		Create(&doc1).Put(&doc2).
 		Get(&got1).Get(got2).
@@ -2105,7 +2299,7 @@ func testActionsOnStructNoRev(t *testing.T, _ Harness, coll *docstore.Collection
 	}
 	checkNoRevisionField(t, got2, docstore.DefaultRevisionField)
 
-	got3 := map[string]interface{}{"name": doc1.Name}
+	got3 := map[string]any{"name": doc1.Name}
 	got4 := item{Name: doc2.Name}
 	if err := coll.Actions().
 		Replace(&doc1).Update(&item{Name: doc2.Name}, docstore.Mods{"I": 1}).
@@ -2135,7 +2329,7 @@ func testExampleInDoc(t *testing.T, _ Harness, coll *docstore.Collection) {
 			t.Fatal(err)
 		}
 	}
-	checkFieldEqual := func(got, want interface{}, field string) {
+	checkFieldEqual := func(got, want any, field string) {
 		t.Helper()
 		fvg, err := MustDocument(got).GetField(field)
 		must(err)
@@ -2156,9 +2350,9 @@ func testExampleInDoc(t *testing.T, _ Harness, coll *docstore.Collection) {
 		NumPublications:  2,
 	}
 
-	doc2 := map[string]interface{}{
+	doc2 := map[string]any{
 		KeyField: "The Heart of a Dog",
-		"author": map[string]interface{}{
+		"author": map[string]any{
 			"First": "Mikhail",
 			"Last":  "Bulgakov",
 		},
@@ -2193,7 +2387,7 @@ func testBeforeDo(t *testing.T, newHarness HarnessMaker) {
 		t.Helper()
 
 		var called bool
-		beforeDo := func(asFunc func(interface{}) bool) error {
+		beforeDo := func(asFunc func(any) bool) error {
 			called = true
 			if asFunc(nil) {
 				return errors.New("asFunc returned true when called with nil, want false")
@@ -2221,7 +2415,7 @@ func testBeforeDo(t *testing.T, newHarness HarnessMaker) {
 			t.Helper()
 			// First, verify that if a BeforeDo function returns an error, so does ActionList.Do.
 			// We depend on that for the rest of the test.
-			al := coll.Actions().BeforeDo(func(func(interface{}) bool) error { return errors.New("") })
+			al := coll.Actions().BeforeDo(func(func(any) bool) error { return errors.New("") })
 			f(al)
 			if err := al.Do(ctx); err == nil {
 				t.Error("beforeDo returning error: got nil from Do, want error")
@@ -2258,7 +2452,7 @@ func testBeforeQuery(t *testing.T, newHarness HarnessMaker) {
 		t.Helper()
 
 		var called bool
-		beforeQuery := func(asFunc func(interface{}) bool) error {
+		beforeQuery := func(asFunc func(any) bool) error {
 			called = true
 			if asFunc(nil) {
 				return errors.New("asFunc returned true when called with nil, want false")
@@ -2341,13 +2535,11 @@ func testAs(t *testing.T, coll *docstore.Collection, st AsTest) {
 
 func clone(m docmap) docmap {
 	r := docmap{}
-	for k, v := range m {
-		r[k] = v
-	}
+	maps.Copy(r, m)
 	return r
 }
 
-func cmpDiff(a, b interface{}, opts ...cmp.Option) string {
+func cmpDiff(a, b any, opts ...cmp.Option) string {
 	// Firestore revisions can be protos.
 	return cmp.Diff(a, b, append([]cmp.Option{cmp.Comparer(proto.Equal)}, opts...)...)
 }

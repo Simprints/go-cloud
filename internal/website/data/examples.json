@@ -87,11 +87,11 @@
 		"imports": "import (\n\t\"context\"\n\t\"fmt\"\n\t\"time\"\n\n\t\"gocloud.dev/docstore/memdocstore\"\n\t\"gocloud.dev/gcerrors\"\n)",
 		"code": "coll, err := memdocstore.OpenCollection(\"Name\", nil)\nif err != nil {\n\treturn err\n}\ndefer coll.Close()\n\n// Create a player.\npat := \u0026Player{Name: \"Pat\", Score: 7}\nif err := coll.Create(ctx, pat); err != nil {\n\treturn err\n}\nfmt.Println(pat) // memdocstore revisions are deterministic, so we can check the output.\n\n// Double a player's score. We cannot use Update to multiply, so we use optimistic\n// locking instead.\n\n// We may have to retry a few times; put a time limit on that.\nctx, cancel := context.WithTimeout(ctx, 30*time.Second)\ndefer cancel()\nfor {\n\t// Get the document.\n\tplayer := \u0026Player{Name: \"Pat\"}\n\tif err := coll.Get(ctx, player); err != nil {\n\t\treturn err\n\t}\n\t// player.DocstoreRevision is set to the document's revision.\n\n\t// Modify the document locally.\n\tplayer.Score *= 2\n\n\t// Replace the document. player.DocstoreRevision will be checked against\n\t// the stored document's revision.\n\terr := coll.Replace(ctx, player)\n\tif err != nil {\n\t\tcode := gcerrors.Code(err)\n\t\t// On FailedPrecondition or NotFound, try again.\n\t\tif code == gcerrors.FailedPrecondition || code == gcerrors.NotFound {\n\t\t\tcontinue\n\t\t}\n\t\treturn err\n\t}\n\tfmt.Println(player)\n\tbreak\n}\n\n// Output:\n// \u0026{Pat 7 1}\n// \u0026{Pat 14 2}"
 	},
-	"gocloud.dev/docstore/awsdynamodb.ExampleOpenCollection": {
-		"imports": "import (\n\t\"github.com/aws/aws-sdk-go/aws/session\"\n\t\"github.com/aws/aws-sdk-go/service/dynamodb\"\n\t\"gocloud.dev/docstore/awsdynamodb\"\n)",
-		"code": "sess, err := session.NewSession()\nif err != nil {\n\treturn err\n}\ncoll, err := awsdynamodb.OpenCollection(\n\tdynamodb.New(sess), \"docstore-test\", \"partitionKeyField\", \"\", nil)\nif err != nil {\n\treturn err\n}\ndefer coll.Close()"
+	"gocloud.dev/docstore/awsdynamodb/v2.ExampleOpenCollection": {
+		"imports": "import (\n\t\"context\"\n\n\t\"github.com/aws/aws-sdk-go-v2/config\"\n\t\"github.com/aws/aws-sdk-go-v2/service/dynamodb\"\n\t\"gocloud.dev/docstore/awsdynamodb/v2\"\n)",
+		"code": "cfg, err := config.LoadDefaultConfig(context.Background())\nif err != nil {\n\treturn err\n}\ncoll, err := awsdynamodb.OpenCollection(\n\tdynamodb.NewFromConfig(cfg), \"docstore-test\", \"partitionKeyField\", \"\", nil)\nif err != nil {\n\treturn err\n}\ndefer coll.Close()"
 	},
-	"gocloud.dev/docstore/awsdynamodb.Example_openCollectionFromURL": {
+	"gocloud.dev/docstore/awsdynamodb/v2.Example_openCollectionFromURL": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/docstore\"\n\t_ \"gocloud.dev/docstore/awsdynamodb\"\n)",
 		"code": "// docstore.OpenCollection creates a *docstore.Collection from a URL.\ncoll, err := docstore.OpenCollection(ctx, \"dynamodb://my-table?partition_key=name\")\nif err != nil {\n\treturn err\n}\ndefer coll.Close()"
 	},
@@ -113,7 +113,7 @@
 	},
 	"gocloud.dev/docstore/memdocstore.ExampleOpenCollectionWithKeyFunc": {
 		"imports": "import (\n\t\"gocloud.dev/docstore\"\n\t\"gocloud.dev/docstore/memdocstore\"\n)",
-		"code": "// The name of a document is constructed from the Game and Player fields.\nnameFromDocument := func(doc docstore.Document) interface{} {\n\ths := doc.(*HighScore)\n\treturn hs.Game + \"|\" + hs.Player\n}\n\ncoll, err := memdocstore.OpenCollectionWithKeyFunc(nameFromDocument, nil)\nif err != nil {\n\treturn err\n}\ndefer coll.Close()"
+		"code": "// The name of a document is constructed from the Game and Player fields.\nnameFromDocument := func(doc docstore.Document) any {\n\ths := doc.(*HighScore)\n\treturn hs.Game + \"|\" + hs.Player\n}\n\ncoll, err := memdocstore.OpenCollectionWithKeyFunc(nameFromDocument, nil)\nif err != nil {\n\treturn err\n}\ndefer coll.Close()"
 	},
 	"gocloud.dev/docstore/memdocstore.Example_openCollectionFromURL": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/docstore\"\n\t_ \"gocloud.dev/docstore/memdocstore\"\n)",
@@ -165,7 +165,7 @@
 	},
 	"gocloud.dev/pubsub.ExampleSubscription_Receive_concurrent": {
 		"imports": "import (\n\t\"context\"\n\t\"fmt\"\n\n\t\"gocloud.dev/pubsub\"\n)",
-		"code": "// Loop on received messages. We can use a channel as a semaphore to limit how\n// many goroutines we have active at a time as well as wait on the goroutines\n// to finish before exiting.\nconst maxHandlers = 10\nsem := make(chan struct{}, maxHandlers)\nrecvLoop:\nfor {\n\tmsg, err := subscription.Receive(ctx)\n\tif err != nil {\n\t\t// Errors from Receive indicate that Receive will no longer succeed.\n\t\tlog.Printf(\"Receiving message: %v\", err)\n\t\tbreak\n\t}\n\n\t// Wait if there are too many active handle goroutines and acquire the\n\t// semaphore. If the context is canceled, stop waiting and start shutting\n\t// down.\n\tselect {\n\tcase sem \u003c- struct{}{}:\n\tcase \u003c-ctx.Done():\n\t\tbreak recvLoop\n\t}\n\n\t// Handle the message in a new goroutine.\n\tgo func() {\n\t\tdefer func() { \u003c-sem }() // Release the semaphore.\n\t\tdefer msg.Ack()          // Messages must always be acknowledged with Ack.\n\n\t\t// Do work based on the message, for example:\n\t\tfmt.Printf(\"Got message: %q\\n\", msg.Body)\n\t}()\n}\n\n// We're no longer receiving messages. Wait to finish handling any\n// unacknowledged messages by totally acquiring the semaphore.\nfor n := 0; n \u003c maxHandlers; n++ {\n\tsem \u003c- struct{}{}\n}"
+		"code": "// Loop on received messages. We can use a channel as a semaphore to limit how\n// many goroutines we have active at a time as well as wait on the goroutines\n// to finish before exiting.\nconst maxHandlers = 10\nsem := make(chan struct{}, maxHandlers)\nrecvLoop:\nfor {\n\tmsg, err := subscription.Receive(ctx)\n\tif err != nil {\n\t\t// Errors from Receive indicate that Receive will no longer succeed.\n\t\tlog.Printf(\"Receiving message: %v\", err)\n\t\tbreak\n\t}\n\n\t// Wait if there are too many active handle goroutines and acquire the\n\t// semaphore. If the context is canceled, stop waiting and start shutting\n\t// down.\n\tselect {\n\tcase sem \u003c- struct{}{}:\n\tcase \u003c-ctx.Done():\n\t\tbreak recvLoop\n\t}\n\n\t// Handle the message in a new goroutine.\n\tgo func() {\n\t\tdefer func() { \u003c-sem }() // Release the semaphore.\n\t\tdefer msg.Ack()          // Messages must always be acknowledged with Ack.\n\n\t\t// Do work based on the message, for example:\n\t\tfmt.Printf(\"Got message: %q\\n\", msg.Body)\n\t}()\n}\n\n// We're no longer receiving messages. Wait to finish handling any\n// unacknowledged messages by totally acquiring the semaphore.\nfor range maxHandlers {\n\tsem \u003c- struct{}{}\n}"
 	},
 	"gocloud.dev/pubsub.ExampleTopic_Send": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/pubsub\"\n)",
@@ -226,6 +226,22 @@
 	"gocloud.dev/pubsub/gcppubsub.Example_openTopicFromURL": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/pubsub\"\n\t_ \"gocloud.dev/pubsub/gcppubsub\"\n)",
 		"code": "topic, err := pubsub.OpenTopic(ctx, \"gcppubsub://projects/myproject/topics/mytopic\")\nif err != nil {\n\treturn err\n}\ndefer topic.Shutdown(ctx)"
+	},
+	"gocloud.dev/pubsub/gcppubsubv2.ExampleOpenSubscription": {
+		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/gcp\"\n\t\"gocloud.dev/pubsub/gcppubsubv2\"\n)",
+		"code": "// Your GCP credentials.\n// See https://cloud.google.com/docs/authentication/production\n// for more info on alternatives.\ncreds, err := gcp.DefaultCredentials(ctx)\nif err != nil {\n\treturn err\n}\n\n// Open a gRPC connection to the GCP Pub/Sub API.\n// Alternatively, skip this and pass nil to Client below to use the default.\nconn, cleanup, err := gcppubsubv2.Dial(ctx, creds.TokenSource)\nif err != nil {\n\treturn err\n}\ndefer cleanup()\n\n// Construct a Client using the connection.\nclient, err := gcppubsubv2.Client(ctx, \"myprojectID\", conn)\nif err != nil {\n\treturn err\n}\ndefer client.Close()\n\n// Construct a *pubsub.Subscription.\nsubscription := gcppubsubv2.OpenSubscription(client, \"example-subscription\", nil)\ndefer subscription.Shutdown(ctx)"
+	},
+	"gocloud.dev/pubsub/gcppubsubv2.ExampleOpenTopic": {
+		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/gcp\"\n\t\"gocloud.dev/pubsub/gcppubsubv2\"\n)",
+		"code": "// Your GCP credentials.\n// See https://cloud.google.com/docs/authentication/production\n// for more info on alternatives.\ncreds, err := gcp.DefaultCredentials(ctx)\nif err != nil {\n\treturn err\n}\n// Open a gRPC connection to the GCP Pub/Sub API.\n// Alternatively, skip this and pass nil to Client below to use the default.\nconn, cleanup, err := gcppubsubv2.Dial(ctx, creds.TokenSource)\nif err != nil {\n\treturn err\n}\ndefer cleanup()\n\n// Construct a Client using the connection.\nclient, err := gcppubsubv2.Client(ctx, \"myprojectid\", conn)\nif err != nil {\n\treturn err\n}\ndefer client.Close()\n\n// Construct a *pubsub.Topic.\ntopic := gcppubsubv2.OpenTopic(client, \"example-topic\", nil)\ndefer topic.Shutdown(ctx)"
+	},
+	"gocloud.dev/pubsub/gcppubsubv2.Example_openSubscriptionFromURL": {
+		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/pubsub\"\n\t_ \"gocloud.dev/pubsub/gcppubsubv2\"\n)",
+		"code": "subscription, err := pubsub.OpenSubscription(ctx,\n\t\"gcppubsubv2://projects/my-project/subscriptions/my-subscription\")\nif err != nil {\n\treturn err\n}\ndefer subscription.Shutdown(ctx)"
+	},
+	"gocloud.dev/pubsub/gcppubsubv2.Example_openTopicFromURL": {
+		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/pubsub\"\n\t_ \"gocloud.dev/pubsub/gcppubsubv2\"\n)",
+		"code": "topic, err := pubsub.OpenTopic(ctx, \"gcppubsubv2://projects/myproject/topics/mytopic\")\nif err != nil {\n\treturn err\n}\ndefer topic.Shutdown(ctx)"
 	},
 	"gocloud.dev/pubsub/kafkapubsub.ExampleOpenSubscription": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/pubsub/kafkapubsub\"\n)",
@@ -378,6 +394,14 @@
 	"gocloud.dev/runtimevar/gcpsecretmanager.Example_openVariableFromURL": {
 		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/runtimevar\"\n\t_ \"gocloud.dev/runtimevar/gcpsecretmanager\"\n)",
 		"code": "// runtimevar.OpenVariable creates a *runtimevar.Variable from a URL.\n// The URL Host+Path are used as the GCP Secret Manager secret key;\n// see https://cloud.google.com/secret-manager\n// for more details.\n\nv, err := runtimevar.OpenVariable(ctx, \"gcpsecretmanager://projects/myproject/secrets/mysecret?decoder=string\")\nif err != nil {\n\treturn err\n}\ndefer v.Close()"
+	},
+	"gocloud.dev/runtimevar/hashivault.ExampleOpenVariable": {
+		"imports": "import (\n\t\"context\"\n\n\t\"github.com/hashicorp/vault/api\"\n\t\"gocloud.dev/runtimevar\"\n\t\"gocloud.dev/runtimevar/hashivault\"\n)",
+		"code": "// Get a client to use with the Vault API.\nclient, err := hashivault.Dial(ctx, \u0026hashivault.Config{\n\tToken: \"CLIENT_TOKEN\",\n\tAPIConfig: api.Config{\n\t\tAddress: \"http://127.0.0.1:8200\",\n\t},\n})\nif err != nil {\n\treturn err\n}\n\n// Construct a *runtimevar.Variable that watches the secret.\nv, err := hashivault.OpenVariable(client, \"myapp/config\", runtimevar.StringDecoder, nil)\nif err != nil {\n\treturn err\n}\ndefer v.Close()"
+	},
+	"gocloud.dev/runtimevar/hashivault.Example_openVariableFromURL": {
+		"imports": "import (\n\t\"context\"\n\n\t\"gocloud.dev/runtimevar\"\n\t_ \"gocloud.dev/runtimevar/hashivault\"\n)",
+		"code": "// runtimevar.OpenVariable creates a *runtimevar.Variable from a URL.\n// The default opener connects to a Vault server based on the environment\n// variables VAULT_SERVER_URL/VAULT_ADDR and VAULT_SERVER_TOKEN/VAULT_TOKEN.\nv, err := runtimevar.OpenVariable(ctx, \"hashivault://myapp/config?decoder=string\")\nif err != nil {\n\treturn err\n}\ndefer v.Close()"
 	},
 	"gocloud.dev/runtimevar/httpvar.ExampleOpenVariable": {
 		"imports": "import (\n\t\"net/http\"\n\n\t\"gocloud.dev/runtimevar\"\n\t\"gocloud.dev/runtimevar/httpvar\"\n)",

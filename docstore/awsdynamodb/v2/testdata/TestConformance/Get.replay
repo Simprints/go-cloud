@@ -1,0 +1,2183 @@
+{
+  "Initial": "AQAAAA7hTg5MIO46RAAA",
+  "Version": "0.2",
+  "Converter": {
+    "ScrubBody": [
+      "MessageAttributes.*",
+      ".*"
+    ],
+    "ClearHeaders": [
+      "^X-Goog-.*Encryption-Key$",
+      "^Amz-Sdk-Invocation-Id$",
+      "^X-Amz-Date$",
+      "^User-Agent$"
+    ],
+    "RemoveRequestHeaders": [
+      "^Authorization$",
+      "^Proxy-Authorization$",
+      "^Connection$",
+      "^Content-Type$",
+      "^Date$",
+      "^Host$",
+      "^Transfer-Encoding$",
+      "^Via$",
+      "^X-Forwarded-.*$",
+      "^X-Cloud-Trace-Context$",
+      "^X-Goog-Api-Client$",
+      "^X-Google-.*$",
+      "^X-Gfe-.*$",
+      "^Authorization$",
+      "^Duration$",
+      "^X-Amz-Security-Token$"
+    ],
+    "RemoveResponseHeaders": [
+      "^X-Google-.*$",
+      "^X-Gfe-.*$"
+    ],
+    "ClearParams": [
+      "^X-Amz-Date$"
+    ],
+    "RemoveParams": [
+      "^X-Amz-Credential$",
+      "^X-Amz-Signature$",
+      "^X-Amz-Security-Token$"
+    ]
+  },
+  "Entries": [
+    {
+      "ID": "4039759f598bf73f",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "31"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DescribeTable"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "599"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "3022004566"
+          ],
+          "X-Amzn-Requestid": [
+            "FTLD9SDRVDJ58I1UL90VQM2GGJVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJUYWJsZSI6eyJBdHRyaWJ1dGVEZWZpbml0aW9ucyI6W3siQXR0cmlidXRlTmFtZSI6Im5hbWUiLCJBdHRyaWJ1dGVUeXBlIjoiUyJ9XSwiQ3JlYXRpb25EYXRlVGltZSI6MS43MjMwNzYwNzk3OTdFOSwiRGVsZXRpb25Qcm90ZWN0aW9uRW5hYmxlZCI6ZmFsc2UsIkl0ZW1Db3VudCI6MCwiS2V5U2NoZW1hIjpbeyJBdHRyaWJ1dGVOYW1lIjoibmFtZSIsIktleVR5cGUiOiJIQVNIIn1dLCJQcm92aXNpb25lZFRocm91Z2hwdXQiOnsiTnVtYmVyT2ZEZWNyZWFzZXNUb2RheSI6MCwiUmVhZENhcGFjaXR5VW5pdHMiOjUsIldyaXRlQ2FwYWNpdHlVbml0cyI6NX0sIlRhYmxlQXJuIjoiYXJuOmF3czpkeW5hbW9kYjp1cy1lYXN0LTI6NDU2NzUyNjY1NTc2OnRhYmxlL2RvY3N0b3JlLXRlc3QtMSIsIlRhYmxlSWQiOiI5N2U0OTNmNC1jZjU3LTQ2YmItOTc4Ny1iOGU4ZDk3ZjUwMDciLCJUYWJsZU5hbWUiOiJkb2NzdG9yZS10ZXN0LTEiLCJUYWJsZVNpemVCeXRlcyI6MCwiVGFibGVTdGF0dXMiOiJBQ1RJVkUiLCJXYXJtVGhyb3VnaHB1dCI6eyJSZWFkVW5pdHNQZXJTZWNvbmQiOjUsIlN0YXR1cyI6IkFDVElWRSIsIldyaXRlVW5pdHNQZXJTZWNvbmQiOjV9fX0="
+      }
+    },
+    {
+      "ID": "075d50e7833afbf7",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "53"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.Scan"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "664"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2923777292"
+          ],
+          "X-Amzn-Requestid": [
+            "HPSQF0CAO2BE3U58E9A9J45PGBVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJDb3VudCI6NCwiSXRlbXMiOlt7IkV0YWciOnsiUyI6ImUyMjJjOTI2LTRjYmQtNDMwOC1iNDc2LTY3YjkxNjIyYTM5ZiJ9LCJuYW1lIjp7IlMiOiJ0ZXN0UmVwbGFjZU1hcCJ9LCJzIjp7IlMiOiJiIn19LHsibmFtZSI6eyJTIjoidGVzdFJldmlzaW9uTWFwIn0sIkV0YWciOnsiUyI6ImNiZDgyMTBkLWVhMGItNDA3OS1iMTFjLTg1YTlkNzFiZmRmZiJ9LCJzIjp7IlMiOiJhIn19LHsiQiI6eyJCT09MIjpmYWxzZX0sIlN0Ijp7IlMiOiJiIn0sIlUiOnsiTiI6IjAifSwiRiI6eyJOIjoiMCJ9LCJJIjp7Ik4iOiIwIn0sIkV0YWciOnsiUyI6IjAyMGNjMzg1LTljOTMtNDFlZi1iOTUzLTFjMDUyYmEzZGNjMSJ9LCJNIjp7Ik5VTEwiOnRydWV9LCJuYW1lIjp7IlMiOiJ0ZXN0UmVwbGFjZVN0cnVjdCJ9LCJEb2NzdG9yZVJldmlzaW9uIjp7Ik5VTEwiOnRydWV9fSx7IkIiOnsiQk9PTCI6ZmFsc2V9LCJTdCI6eyJTIjoiYSJ9LCJVIjp7Ik4iOiIwIn0sIkYiOnsiTiI6IjAifSwiSSI6eyJOIjoiMCJ9LCJFdGFnIjp7IlMiOiI0OGQxYThmZC00NWU1LTQ2M2MtOTNkOC04NWI1MDFmYjY0NmIifSwiTSI6eyJOVUxMIjp0cnVlfSwibmFtZSI6eyJTIjoidGVzdFJldmlzaW9uU3RydWN0In0sIkRvY3N0b3JlUmV2aXNpb24iOnsiTlVMTCI6dHJ1ZX19XSwiU2Nhbm5lZENvdW50Ijo0fQ=="
+      }
+    },
+    {
+      "ID": "02a35c7208d5b871",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "70"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "M4J2SEG2BFH3V1DKUCL84HDSQBVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "2f7983b4ff2b7775",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "69"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "NTJA49QUOT5FT92Q86IROC6RGJVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "60b0112086b67629",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "73"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "3NAFUIODPQUUALPT3SE2KA9DVFVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "8f8745788c474ee9",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "72"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:32 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "Q9FMON8P93KM011G2MM2SUIGQJVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "cddfc659336a16ff",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "227"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "DQBALSI2P2P45KEIVGEC68ERBNVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "8665dae76d84c8c8",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "97"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "245"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "1497641603"
+          ],
+          "X-Amzn-Requestid": [
+            "KMR0TANDAD42KR5RQ6PJ01PIGBVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJpIjp7Ik4iOiI5NSJ9LCJzIjp7IlMiOiJhIHN0cmluZyJ9LCJtIjp7Ik0iOnsiYSI6eyJTIjoib25lIn0sImIiOnsiUyI6InR3byJ9fX0sIm5hbWUiOnsiUyI6InRlc3RHZXRNYXAifSwiRG9jc3RvcmVSZXZpc2lvbiI6eyJTIjoiZjRiZWJlZjEtOWM3NC00OWYwLTg4MWMtNGY3ODFhMzUzOWZiIn0sImYiOnsiTiI6IjMyLjMifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "04d22949802dec83",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "285"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "AO0TR6GPKPK1AS09ONG82CCVK3VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "e25dc3a0ee480ce2",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "100"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "303"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "790745304"
+          ],
+          "X-Amzn-Requestid": [
+            "O842SCNJ00HMLM7505IUGSQ6VVVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJCIjp7IkJPT0wiOmZhbHNlfSwiU3QiOnsiUyI6ImEgc3RyaW5nIn0sIlUiOnsiTiI6IjAifSwiRiI6eyJOIjoiMzIuMyJ9LCJJIjp7Ik4iOiI5NSJ9LCJFdGFnIjp7Ik5VTEwiOnRydWV9LCJNIjp7Ik0iOnsiYSI6eyJTIjoib25lIn0sImIiOnsiUyI6InR3byJ9fX0sIm5hbWUiOnsiUyI6InRlc3RHZXRTdHJ1Y3QifSwiRG9jc3RvcmVSZXZpc2lvbiI6eyJTIjoiZmIyNjE4YjQtOTNiZi00NDFmLWExY2UtZjJiYzFkYzM0ODFmIn19XX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    },
+    {
+      "ID": "98d2cbb4cf49c1d4",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "229"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "QP4RNSM22LVVPR4JM835TT9LOJVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "caa0537bf2cf202b",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "234"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "195"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "4095829345"
+          ],
+          "X-Amzn-Requestid": [
+            "6U78HV8MCJ85SUCMHVA68F09I7VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJEb2NzdG9yZVJldmlzaW9uIjp7IlMiOiJmMWJjYTNjMS02M2I5LTQ2NGMtYWVlMS0wN2JmOGRiMDEzNWIifSwiZiI6eyJOIjoiMzIuMyJ9LCJtIjp7Ik0iOnsiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldE1hcEZQIn19XX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    },
+    {
+      "ID": "6c95fba341d158b3",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "287"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "D4QQ7H67SN01P558KRDVJKR75BVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "45b9b872aa930612",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "238"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "203"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "1881215191"
+          ],
+          "X-Amzn-Requestid": [
+            "EM5LNIC33U5DG8BBK04FI7TMCNVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJEb2NzdG9yZVJldmlzaW9uIjp7IlMiOiIzZDYyNDgyYS1lNjA3LTRmYTMtOWIwZi1lY2UzMWJiODJmNzQifSwiTSI6eyJNIjp7ImEiOnsiUyI6Im9uZSJ9fX0sIlN0Ijp7IlMiOiJhIHN0cmluZyJ9LCJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0RlAifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "2b510ef93d35942f",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "287"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "PPQM3RNE5NRDSQ6PGLAC41T2HRVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "2b4b9897bc49cc80",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "210"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "89"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2845408016"
+          ],
+          "X-Amzn-Requestid": [
+            "64TUQPB1TK5CB57TIANLCKDUNNVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0V0MifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "6c88f1a945742fad",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "99"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "57"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "289144682"
+          ],
+          "X-Amzn-Requestid": [
+            "01Q0HG47IVEL69M71F26HKTV97VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbXX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    },
+    {
+      "ID": "fc74793625a0b456",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "31"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DescribeTable"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "599"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "3022004566"
+          ],
+          "X-Amzn-Requestid": [
+            "AOAMOFL526H10TND7HLIA9QP03VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJUYWJsZSI6eyJBdHRyaWJ1dGVEZWZpbml0aW9ucyI6W3siQXR0cmlidXRlTmFtZSI6Im5hbWUiLCJBdHRyaWJ1dGVUeXBlIjoiUyJ9XSwiQ3JlYXRpb25EYXRlVGltZSI6MS43MjMwNzYwNzk3OTdFOSwiRGVsZXRpb25Qcm90ZWN0aW9uRW5hYmxlZCI6ZmFsc2UsIkl0ZW1Db3VudCI6MCwiS2V5U2NoZW1hIjpbeyJBdHRyaWJ1dGVOYW1lIjoibmFtZSIsIktleVR5cGUiOiJIQVNIIn1dLCJQcm92aXNpb25lZFRocm91Z2hwdXQiOnsiTnVtYmVyT2ZEZWNyZWFzZXNUb2RheSI6MCwiUmVhZENhcGFjaXR5VW5pdHMiOjUsIldyaXRlQ2FwYWNpdHlVbml0cyI6NX0sIlRhYmxlQXJuIjoiYXJuOmF3czpkeW5hbW9kYjp1cy1lYXN0LTI6NDU2NzUyNjY1NTc2OnRhYmxlL2RvY3N0b3JlLXRlc3QtMSIsIlRhYmxlSWQiOiI5N2U0OTNmNC1jZjU3LTQ2YmItOTc4Ny1iOGU4ZDk3ZjUwMDciLCJUYWJsZU5hbWUiOiJkb2NzdG9yZS10ZXN0LTEiLCJUYWJsZVNpemVCeXRlcyI6MCwiVGFibGVTdGF0dXMiOiJBQ1RJVkUiLCJXYXJtVGhyb3VnaHB1dCI6eyJSZWFkVW5pdHNQZXJTZWNvbmQiOjUsIlN0YXR1cyI6IkFDVElWRSIsIldyaXRlVW5pdHNQZXJTZWNvbmQiOjV9fX0="
+      }
+    },
+    {
+      "ID": "ab67ddaff37412b3",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "53"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.Scan"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "1163"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2248801167"
+          ],
+          "X-Amzn-Requestid": [
+            "J6VA38MUSDME0QNGU5AS3KD4CVVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJDb3VudCI6NSwiSXRlbXMiOlt7ImkiOnsiTiI6Ijk1In0sInMiOnsiUyI6ImEgc3RyaW5nIn0sIm0iOnsiTSI6eyJhIjp7IlMiOiJvbmUifSwiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldE1hcEZQIn0sIkRvY3N0b3JlUmV2aXNpb24iOnsiUyI6ImYxYmNhM2MxLTYzYjktNDY0Yy1hZWUxLTA3YmY4ZGIwMTM1YiJ9LCJmIjp7Ik4iOiIzMi4zIn19LHsiQiI6eyJCT09MIjpmYWxzZX0sIlN0Ijp7IlMiOiJhIHN0cmluZyJ9LCJVIjp7Ik4iOiIwIn0sIkYiOnsiTiI6IjMyLjMifSwiSSI6eyJOIjoiOTUifSwiRXRhZyI6eyJOVUxMIjp0cnVlfSwiTSI6eyJNIjp7ImEiOnsiUyI6Im9uZSJ9LCJiIjp7IlMiOiJ0d28ifX19LCJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0In0sIkRvY3N0b3JlUmV2aXNpb24iOnsiUyI6ImZiMjYxOGI0LTkzYmYtNDQxZi1hMWNlLWYyYmMxZGMzNDgxZiJ9fSx7IkIiOnsiQk9PTCI6ZmFsc2V9LCJTdCI6eyJTIjoiYSBzdHJpbmcifSwiVSI6eyJOIjoiMCJ9LCJGIjp7Ik4iOiIzMi4zIn0sIkkiOnsiTiI6Ijk1In0sIkV0YWciOnsiTlVMTCI6dHJ1ZX0sIk0iOnsiTSI6eyJhIjp7IlMiOiJvbmUifSwiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldFN0cnVjdFdDIn0sIkRvY3N0b3JlUmV2aXNpb24iOnsiUyI6IjgyZDJjMzNmLTBmODYtNDE0NS04YmQyLThlMWI0YjdhZjlmMCJ9fSx7ImkiOnsiTiI6Ijk1In0sInMiOnsiUyI6ImEgc3RyaW5nIn0sIm0iOnsiTSI6eyJhIjp7IlMiOiJvbmUifSwiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldE1hcCJ9LCJEb2NzdG9yZVJldmlzaW9uIjp7IlMiOiJmNGJlYmVmMS05Yzc0LTQ5ZjAtODgxYy00Zjc4MWEzNTM5ZmIifSwiZiI6eyJOIjoiMzIuMyJ9fSx7IkIiOnsiQk9PTCI6ZmFsc2V9LCJTdCI6eyJTIjoiYSBzdHJpbmcifSwiVSI6eyJOIjoiMCJ9LCJGIjp7Ik4iOiIzMi4zIn0sIkkiOnsiTiI6Ijk1In0sIkV0YWciOnsiTlVMTCI6dHJ1ZX0sIk0iOnsiTSI6eyJhIjp7IlMiOiJvbmUifSwiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldFN0cnVjdEZQIn0sIkRvY3N0b3JlUmV2aXNpb24iOnsiUyI6IjNkNjI0ODJhLWU2MDctNGZhMy05YjBmLWVjZTMxYmI4MmY3NCJ9fV0sIlNjYW5uZWRDb3VudCI6NX0="
+      }
+    },
+    {
+      "ID": "f36e79316cb45207",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "68"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "444RPP51JKG02MBC05SCP6JJ23VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "5c5ce0f122aaaaa8",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "70"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "N71THINQIGF7NV4NLDJ5T1B8VJVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "58bbf75fd7ae5d1b",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "70"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "2OL4SU64NTNF5NG33755FKJBOVVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "5958d9610f4d51f8",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "67"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:33 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "34CAIRUD7BBH1A2P7TSG6HVG2VVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "a553bd80af3a112b",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "65"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.DeleteItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "AGQHSF2UH6FMBIV8ILS7C8LHRNVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "0c4a5d1aa9c3cf73",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "215"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "8NI3075844VSK46G4OV8QQ454FVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "a6830d5d3d01eeac",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "97"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "233"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "435471445"
+          ],
+          "X-Amzn-Requestid": [
+            "8D37CNK3PU9RE1RRN4BCEMKHGBVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJpIjp7Ik4iOiI5NSJ9LCJFdGFnIjp7IlMiOiJmNzQ5ODQ0Zi0wMjAzLTQ2NDUtYmE1Yi1jMjlmNmE5YWY3YmEifSwicyI6eyJTIjoiYSBzdHJpbmcifSwibSI6eyJNIjp7ImEiOnsiUyI6Im9uZSJ9LCJiIjp7IlMiOiJ0d28ifX19LCJuYW1lIjp7IlMiOiJ0ZXN0R2V0TWFwIn0sImYiOnsiTiI6IjMyLjMifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "4cc0065f5a1d93e7",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "285"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "GICM5ECS05DFM5UK5C3A5I4B6BVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "bd7f4f526a2ee694",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "100"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "303"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "1655920843"
+          ],
+          "X-Amzn-Requestid": [
+            "MJM4N5K80T4H91PS8UKB2TTLJ7VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJCIjp7IkJPT0wiOmZhbHNlfSwiU3QiOnsiUyI6ImEgc3RyaW5nIn0sIlUiOnsiTiI6IjAifSwiRiI6eyJOIjoiMzIuMyJ9LCJJIjp7Ik4iOiI5NSJ9LCJFdGFnIjp7IlMiOiI5NThmNzk2OS1kYzg5LTRmMzEtYjUyOS0xMTU0YzYyYWEwMDYifSwiTSI6eyJNIjp7ImEiOnsiUyI6Im9uZSJ9LCJiIjp7IlMiOiJ0d28ifX19LCJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0In0sIkRvY3N0b3JlUmV2aXNpb24iOnsiTlVMTCI6dHJ1ZX19XX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    },
+    {
+      "ID": "59f0f5c0dbcc9b46",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "217"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "O4MMP0GUA3RMVFNH2NV4V4M6M7VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "1a08625b5b48b6ea",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "222"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "183"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "3237943276"
+          ],
+          "X-Amzn-Requestid": [
+            "C4R8MCCDRD1ASU2HBMMCVSNOPNVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJFdGFnIjp7IlMiOiJiZTBkMjQzMy01MjMyLTRmZWMtYmQ5Ni1kODQ5OTJhZjE4NTkifSwiZiI6eyJOIjoiMzIuMyJ9LCJtIjp7Ik0iOnsiYiI6eyJTIjoidHdvIn19fSwibmFtZSI6eyJTIjoidGVzdEdldE1hcEZQIn19XX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    },
+    {
+      "ID": "c0900181266758b4",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "287"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "A6C6G6M2LS8L6FF8FS2531FQMRVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "bb7dfc539d160deb",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "226"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "191"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "1521370912"
+          ],
+          "X-Amzn-Requestid": [
+            "UT2E84R9B9I604JLO7S9QRU8Q3VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJFdGFnIjp7IlMiOiJjZjNiMzdmYS1iNTQ2LTRmNmYtOTE1MS02Yzk5NDc2Y2VhNWUifSwiTSI6eyJNIjp7ImEiOnsiUyI6Im9uZSJ9fX0sIlN0Ijp7IlMiOiJhIHN0cmluZyJ9LCJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0RlAifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "a5a9b8a39cdc5543",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "287"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.PutItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "2"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2745614147"
+          ],
+          "X-Amzn-Requestid": [
+            "GACBN81U91KA74HUHUEMRD4K57VV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "e30="
+      }
+    },
+    {
+      "ID": "0277d516961ea9e2",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "210"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "89"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "2845408016"
+          ],
+          "X-Amzn-Requestid": [
+            "2EAF17SQ5NFHB55SPO3I8CIRERVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbeyJuYW1lIjp7IlMiOiJ0ZXN0R2V0U3RydWN0V0MifX1dfSwiVW5wcm9jZXNzZWRLZXlzIjp7fX0="
+      }
+    },
+    {
+      "ID": "acbfcb27fc9a4f2d",
+      "Request": {
+        "Method": "POST",
+        "URL": "https://dynamodb.us-east-2.amazonaws.com/",
+        "Header": {
+          "Accept-Encoding": [
+            "identity"
+          ],
+          "Amz-Sdk-Invocation-Id": [
+            "CLEARED"
+          ],
+          "Amz-Sdk-Request": [
+            "attempt=1; max=1"
+          ],
+          "Content-Length": [
+            "99"
+          ],
+          "User-Agent": [
+            "CLEARED"
+          ],
+          "X-Amz-Date": [
+            "CLEARED"
+          ],
+          "X-Amz-Target": [
+            "DynamoDB_20120810.BatchGetItem"
+          ]
+        },
+        "MediaType": "application/x-amz-json-1.0",
+        "BodyParts": [
+          "Q0xFQVJFRA=="
+        ]
+      },
+      "Response": {
+        "StatusCode": 200,
+        "Proto": "HTTP/1.1",
+        "ProtoMajor": 1,
+        "ProtoMinor": 1,
+        "Header": {
+          "Content-Length": [
+            "57"
+          ],
+          "Content-Type": [
+            "application/x-amz-json-1.0"
+          ],
+          "Date": [
+            "Thu, 19 Mar 2026 15:33:34 GMT"
+          ],
+          "Server": [
+            "Server"
+          ],
+          "X-Amz-Crc32": [
+            "289144682"
+          ],
+          "X-Amzn-Requestid": [
+            "TKRVLOKDDJ3BUSRB22BAS6MJBBVV4KQNSO5AEMVJF66Q9ASUAAJG"
+          ]
+        },
+        "Body": "eyJSZXNwb25zZXMiOnsiZG9jc3RvcmUtdGVzdC0xIjpbXX0sIlVucHJvY2Vzc2VkS2V5cyI6e319"
+      }
+    }
+  ]
+}

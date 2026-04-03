@@ -454,6 +454,33 @@ func TestOpenBucketFromURL(t *testing.T) {
 	}
 }
 
+func TestEscapeBucketRoot(t *testing.T) {
+	ctx := context.Background()
+	tdir := t.TempDir()
+	dir := filepath.Join(tdir, "go-cloud-fileblob")
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	b, err := OpenBucket(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+
+	it := b.List(&blob.ListOptions{
+		Prefix: "../",
+	})
+	_, err = it.Next(ctx)
+	if err == nil || err == io.EOF || !strings.Contains(err.Error(), "escapes bucket root") {
+		t.Fatalf("Got no error or unexpected error when trying to escape bucket root via List (got %v)", err)
+	}
+
+	err = b.Delete(ctx, "..")
+	if err == nil || !strings.Contains(err.Error(), "escapes bucket root") {
+		t.Fatalf("Got no error or unexpected error when trying to escape bucket root via Delete (got %v)", err)
+	}
+}
+
 func TestListAtRoot(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("/ as root is a unix concept")
@@ -507,8 +534,7 @@ func TestSkipMetadata(t *testing.T) {
 		{"file://" + dirpath + "?metadata=", true}, // … and explicitly.
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	for _, test := range tests {
 		b, err := blob.OpenBucket(ctx, test.URL)
 		if b != nil {

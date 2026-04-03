@@ -27,7 +27,7 @@ import (
 
 func (c *collection) RunGetQuery(_ context.Context, q *driver.Query) (driver.DocumentIterator, error) {
 	if q.BeforeQuery != nil {
-		if err := q.BeforeQuery(func(interface{}) bool { return false }); err != nil {
+		if err := q.BeforeQuery(func(any) bool { return false }); err != nil {
 			return nil, err
 		}
 	}
@@ -37,7 +37,7 @@ func (c *collection) RunGetQuery(_ context.Context, q *driver.Query) (driver.Doc
 
 	var resultDocs []storedDoc
 	for _, doc := range c.docs {
-		if filtersMatch(q.Filters, doc) {
+		if filtersMatch(q.Filters, doc, c.opts.AllowNestedSliceQueries) {
 			resultDocs = append(resultDocs, doc)
 		}
 	}
@@ -74,22 +74,22 @@ func (c *collection) RunGetQuery(_ context.Context, q *driver.Query) (driver.Doc
 	}, nil
 }
 
-func filtersMatch(fs []driver.Filter, doc storedDoc) bool {
+func filtersMatch(fs []driver.Filter, doc storedDoc, nested bool) bool {
 	for _, f := range fs {
-		if !filterMatches(f, doc) {
+		if !filterMatches(f, doc, nested) {
 			return false
 		}
 	}
 	return true
 }
 
-func filterMatches(f driver.Filter, doc storedDoc) bool {
-	docval, err := getAtFieldPath(doc, f.FieldPath)
+func filterMatches(f driver.Filter, doc storedDoc, nested bool) bool {
+	docval, err := getAtFieldPath(doc, f.FieldPath, nested)
 	// missing or bad field path => no match
 	if err != nil {
 		return false
 	}
-	c, ok := compare(docval, f.Value)
+	c, ok := compare(docval, f.Value, f.Op)
 	if !ok {
 		return false
 	}
@@ -122,28 +122,50 @@ func applyComparison(op string, c int) bool {
 	}
 }
 
-func compare(x1, x2 interface{}) (int, bool) {
+func compare(x1, x2 any, op string) (int, bool) {
 	v1 := reflect.ValueOf(x1)
 	v2 := reflect.ValueOf(x2)
 	// this if for array-contains queries. We are just inverting the parameters x1 and x2 as it's the same logic
 	// as the in/not-in queries.
 	if v1.Kind() == reflect.Slice {
-		return compare(x2, x1)
+		return compare(x2, x1, op)
 	}
 	// this is for in/not-in queries.
 	// return 0 if x1 is in slice x2, -1 if not.
 	if v2.Kind() == reflect.Slice {
-		for i := 0; i < v2.Len(); i++ {
-			if c, ok := compare(x1, v2.Index(i).Interface()); ok {
-				if !ok {
-					return 0, false
-				}
+		for i := range v2.Len() {
+			if c, ok := compare(x1, v2.Index(i).Interface(), op); ok {
 				if c == 0 {
 					return 0, true
+				}
+				if op != "in" && op != "not-in" {
+					return c, true
 				}
 			}
 		}
 		return -1, true
+	}
+	// See Options.AllowNestedSliceQueries
+	// When querying for x2 in the document and x1 is a list of values we only need one value to match
+	// the comparison value depends on the operator.
+	if v1.Kind() == reflect.Slice {
+		v2Greater := false
+		v2Less := false
+		for i := range v1.Len() {
+			if c, ok := compare(x2, v1.Index(i).Interface(), op); ok {
+				if c == 0 {
+					return 0, true
+				}
+				v2Greater = v2Greater || c > 0
+				v2Less = v2Less || c < 0
+			}
+		}
+		if op[0] == '>' && v2Less {
+			return 1, true
+		} else if op[0] == '<' && v2Greater {
+			return -1, true
+		}
+		return 0, false
 	}
 	if v1.Kind() == reflect.String && v2.Kind() == reflect.String {
 		return strings.Compare(v1.String(), v2.String()), true
@@ -167,7 +189,7 @@ func compare(x1, x2 interface{}) (int, bool) {
 
 func sortDocs(docs []storedDoc, field string, asc bool) {
 	sort.Slice(docs, func(i, j int) bool {
-		c, ok := compare(docs[i][field], docs[j][field])
+		c, ok := compare(docs[i][field], docs[j][field], ">")
 		if !ok {
 			return false
 		}
@@ -203,7 +225,7 @@ func (it *docIterator) Next(ctx context.Context, doc driver.Document) error {
 
 func (it *docIterator) Stop() { it.err = io.EOF }
 
-func (it *docIterator) As(i interface{}) bool { return false }
+func (it *docIterator) As(i any) bool { return false }
 
 func (c *collection) QueryPlan(q *driver.Query) (string, error) {
 	return "", nil
