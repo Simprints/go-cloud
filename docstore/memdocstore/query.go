@@ -125,11 +125,6 @@ func applyComparison(op string, c int) bool {
 func compare(x1, x2 any, op string) (int, bool) {
 	v1 := reflect.ValueOf(x1)
 	v2 := reflect.ValueOf(x2)
-	// this if for array-contains queries. We are just inverting the parameters x1 and x2 as it's the same logic
-	// as the in/not-in queries.
-	if v1.Kind() == reflect.Slice {
-		return compare(x2, x1, op)
-	}
 	// this is for in/not-in queries.
 	// return 0 if x1 is in slice x2, -1 if not.
 	if v2.Kind() == reflect.Slice {
