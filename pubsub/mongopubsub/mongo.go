@@ -127,9 +127,9 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 	}
 	dbName := u.Host
 	if dbName == "" {
-		return nil, fmt.Errorf("open bucket %s: URL must have a non-empty Host (database name)", u)
+		return nil, fmt.Errorf("open subscription %s: URL must have a non-empty Host (database name)", u)
 	}
-	pathSplit := strings.Split(u.Path, "/")
+	pathSplit := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
 	if len(pathSplit) != 2 {
 		return nil, fmt.Errorf("open subscription %s: URL path must be in the format /topic/subscription", u)
 	}
