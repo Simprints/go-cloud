@@ -283,10 +283,8 @@ func newSubscription(ctx context.Context, topic, sub *mongo.Collection, ackDeadl
 	}
 	s.wg.Add(1)
 	go func() {
-		fmt.Println("Start receiving change stream events")
 		for s.copyStream.Next(streamCtx) {
 			var event insertEvent[message]
-			fmt.Println("Received change stream event")
 			if err := s.copyStream.Decode(&event); err != nil {
 				s.receiveErr = err
 				continue
