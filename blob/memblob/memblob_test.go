@@ -51,6 +51,9 @@ func (h *harness) MakeDriverForNonexistentBucket(ctx context.Context) (driver.Bu
 	return nil, nil
 }
 
+func (*harness) SupportsCopy() bool               { return true }
+func (*harness) SupportsNonSlashDelimiters() bool { return true }
+
 func (h *harness) Close() {}
 
 func TestConformance(t *testing.T) {
@@ -95,7 +98,11 @@ func TestOpenBucketFromURL(t *testing.T) {
 	for _, test := range tests {
 		b, err := blob.OpenBucket(ctx, test.URL)
 		if b != nil {
-			defer b.Close()
+			defer func(b *blob.Bucket) {
+				if err := b.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}(b)
 		}
 		if (err != nil) != test.WantErr {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)

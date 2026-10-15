@@ -24,7 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
-	s3manager "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -83,6 +83,9 @@ func (h *harness) MakeDriverForNonexistentBucket(ctx context.Context) (driver.Bu
 	return openBucket(ctx, h.client, "go-cdk-bucket-does-not-exist", h.opts)
 }
 
+func (*harness) SupportsCopy() bool               { return true }
+func (*harness) SupportsNonSlashDelimiters() bool { return true }
+
 func (h *harness) Close() {
 	h.closer()
 }
@@ -134,6 +137,9 @@ func (v verifyContentLanguage) ErrorCheck(b *blob.Bucket, err error) error {
 	if !b.ErrorAs(err, &e) {
 		return errors.New("blob.ErrorAs failed")
 	}
+	if !errors.As(err, &e) {
+		return errors.New("error.As failed")
+	}
 	return nil
 }
 
@@ -150,17 +156,13 @@ func (v verifyContentLanguage) BeforeRead(as func(any) bool) error {
 
 func (v verifyContentLanguage) BeforeWrite(as func(any) bool) error {
 	var (
-		req      *s3.PutObjectInput
-		uploader *s3manager.Uploader
+		req *transfermanager.UploadObjectInput
+		tm  *transfermanager.Client
 	)
-	if !as(&req) || !as(&uploader) {
-		return errors.New("Writer.As failed for PutObjectInput")
+	if !as(&req) || !as(&tm) {
+		return errors.New("Writer.As failed")
 	}
 	req.ContentLanguage = aws.String(language)
-	var u *s3manager.Uploader
-	if !as(&u) {
-		return errors.New("Writer.As failed for Uploader")
-	}
 	return nil
 }
 
@@ -168,6 +170,14 @@ func (v verifyContentLanguage) BeforeCopy(as func(any) bool) error {
 	var in *s3.CopyObjectInput
 	if !as(&in) {
 		return errors.New("BeforeCopy.As failed")
+	}
+	return nil
+}
+
+func (v verifyContentLanguage) BeforeDelete(as func(any) bool) error {
+	var in *s3.DeleteObjectInput
+	if !as(&in) {
+		return errors.New("BeforeDelete.As failed")
 	}
 	return nil
 }
@@ -290,7 +300,11 @@ func TestOpenBucket(t *testing.T) {
 			// Create portable type.
 			b, err := OpenBucket(ctx, client, test.bucketName, nil)
 			if b != nil {
-				defer b.Close()
+				defer func(b *blob.Bucket) {
+					if err := b.Close(); err != nil {
+						t.Errorf("failed to Close: %v", err)
+					}
+				}(b)
 			}
 			if (err != nil) != test.wantErr {
 				t.Errorf("got err %v want error %v", err, test.wantErr)
@@ -368,7 +382,11 @@ func TestOpenBucketFromURL(t *testing.T) {
 	for _, test := range tests {
 		b, err := blob.OpenBucket(ctx, test.URL)
 		if b != nil {
-			defer b.Close()
+			defer func(b *blob.Bucket) {
+				if err := b.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}(b)
 		}
 		if (err != nil) != test.WantErr {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
@@ -438,7 +456,11 @@ func TestChecksumConfigurationPassthrough(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to open bucket: %v", err)
 			}
-			defer bucket.Close()
+			defer func() {
+				if err := bucket.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}()
 
 			// Verify that the checksum configuration was applied
 			// We can't directly access the internal bucket struct, but we can verify
@@ -449,6 +471,46 @@ func TestChecksumConfigurationPassthrough(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequestChecksumCalculation(t *testing.T) {
+	ctx := context.Background()
+	for description, enumValue := range map[string]aws.RequestChecksumCalculation{
+		"WhenRequired":  aws.RequestChecksumCalculationWhenRequired,
+		"WhenSupported": aws.RequestChecksumCalculationWhenSupported} {
+		t.Run(description, func(t *testing.T) {
+
+			key := "checksum-calc-" + description
+			keyValue := "anything"
+
+			h, err := newHarness(ctx, t)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer h.Close()
+
+			h.(*harness).opts = &Options{RequestChecksumCalculation: enumValue}
+			drv, err := h.MakeDriver(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b := blob.NewBucket(drv)
+			defer func() {
+				if err := b.Close(); err != nil {
+					t.Errorf("failed to close: %v", err)
+				}
+			}()
+			if err := b.WriteAll(ctx, key, []byte(keyValue), nil); err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := b.Delete(ctx, key); err != nil {
+					t.Errorf("failed to delete key %q: %v", key, err)
+				}
+			}()
+		})
+	}
+
 }
 
 func TestToServerSideEncryptionType(t *testing.T) {

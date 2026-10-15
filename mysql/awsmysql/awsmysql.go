@@ -97,16 +97,18 @@ func (uo *URLOpener) OpenMySQLURL(ctx context.Context, u *url.URL) (*sql.DB, err
 	// awsmysql://iam-user@host:port/dbname
 	var iam func(context.Context) (string, error)
 	if _, ok := u.User.Password(); !ok {
-		var (
-			q       = u.Query()
-			profile = q.Get("aws_profile")
-		)
-		q.Del("aws_profile")
-		cfg, err := config.LoadDefaultConfig(ctx,
-			config.WithHTTPClient(uo.HTTPClient),    // Ignored if nil.
-			config.WithSharedConfigProfile(profile)) // Ignored if empty.
+		q := u.Query()
+		var cfgOpts []func(*config.LoadOptions) error
+		if uo.HTTPClient != nil {
+			cfgOpts = append(cfgOpts, config.WithHTTPClient(uo.HTTPClient))
+		}
+		if profile := q.Get("aws_profile"); profile != "" {
+			cfgOpts = append(cfgOpts, config.WithSharedConfigProfile(profile))
+			q.Del("aws_profile")
+		}
+		cfg, err := config.LoadDefaultConfig(ctx, cfgOpts...)
 		if err != nil {
-			return nil, fmt.Errorf("open OpenMySQLURL: load AWS config: %v", err)
+			return nil, fmt.Errorf("open OpenMySQLURL: load AWS config: %w", err)
 		}
 		creds := cfg.Credentials
 		if roleARN := q.Get("aws_role_arn"); roleARN != "" {
@@ -128,6 +130,7 @@ func (uo *URLOpener) OpenMySQLURL(ctx context.Context, u *url.URL) (*sql.DB, err
 	if err != nil {
 		return nil, err
 	}
+	cfg.AllowCleartextPasswords = true
 	c := &connector{
 		cfg:      cfg,
 		iam:      iam,
@@ -155,7 +158,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		certPool, err := c.provider.RDSCertPool(ctx)
 		if err != nil {
 			c.sem <- struct{}{} // release
-			return nil, fmt.Errorf("connect RDS: %v", err)
+			return nil, fmt.Errorf("connect RDS: %w", err)
 		}
 		c.cfg.TLS = &tls.Config{RootCAs: certPool}
 		close(c.ready)
@@ -163,18 +166,18 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	case <-c.ready:
 		// Already succeeded.
 	case <-ctx.Done():
-		return nil, fmt.Errorf("connect RDS: waiting for certificates: %v", ctx.Err())
+		return nil, fmt.Errorf("connect RDS: waiting for certificates: %w", ctx.Err())
 	}
 	cfg := c.cfg.Clone()
 	if c.iam != nil {
 		var err error
 		if cfg.Passwd, err = c.iam(ctx); err != nil {
-			return nil, fmt.Errorf("connect RDS: refresh auth token: %v", err)
+			return nil, fmt.Errorf("connect RDS: refresh auth token: %w", err)
 		}
 	}
 	inner, err := mysql.NewConnector(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("connect RDS: create connector: %v", err)
+		return nil, fmt.Errorf("connect RDS: create connector: %w", err)
 	}
 	return inner.Connect(ctx)
 }

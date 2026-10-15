@@ -24,7 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
+	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys"
 	"gocloud.dev/internal/testing/setup"
 	"gocloud.dev/internal/useragent"
 	"gocloud.dev/secrets"
@@ -105,7 +105,7 @@ func newHarness(ctx context.Context, t *testing.T) (drivertest.Harness, error) {
 		var creds azcore.TokenCredential
 		var err error
 		if *setup.Record {
-			initEnv()
+			initEnv(t)
 			creds, err = azidentity.NewEnvironmentCredential(nil)
 		} else {
 			creds = &dummyToken{}
@@ -128,7 +128,7 @@ func newHarness(ctx context.Context, t *testing.T) (drivertest.Harness, error) {
 	}, nil
 }
 
-func initEnv() {
+func initEnv(t *testing.T) {
 	// For Client Credentials authorization, set AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
 	// For Client Certificate and Azure Managed Service Identity, see doc below for help
 	// https://github.com/Azure/azure-sdk-for-go
@@ -137,8 +137,8 @@ func initEnv() {
 		os.Getenv("AZURE_CLIENT_SECRET") == "" {
 		log.Fatal("Missing environment for recording tests, set AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET")
 	}
-	os.Setenv("AZURE_ENVIRONMENT", "AzurePublicCloud")
-	os.Setenv("AZURE_AD_RESOURCE", "https://vault.azure.net")
+	t.Setenv("AZURE_ENVIRONMENT", "AzurePublicCloud")
+	t.Setenv("AZURE_AD_RESOURCE", "https://vault.azure.net")
 }
 
 func TestConformance(t *testing.T) {
@@ -155,6 +155,9 @@ func (v verifyAs) ErrorCheck(k *secrets.Keeper, err error) error {
 	var e *azcore.ResponseError
 	if !k.ErrorAs(err, &e) {
 		return errors.New("Keeper.ErrorAs failed")
+	}
+	if !errors.As(err, &e) {
+		return errors.New("errors.As failed")
 	}
 	return nil
 }
@@ -244,7 +247,11 @@ func TestKeyIDRE(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer k.Close()
+			defer func() {
+				if err := k.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}()
 
 			if k.keyVaultURI != testCase.keyVaultURI {
 				t.Errorf("got key vault URI %s, want key vault URI %s", k.keyVaultURI, testCase.keyVaultURI)

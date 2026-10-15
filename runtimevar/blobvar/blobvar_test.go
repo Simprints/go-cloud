@@ -66,7 +66,7 @@ func (h *harness) DeleteVariable(ctx context.Context, name string) error {
 }
 
 func (h *harness) Close() {
-	h.bucket.Close()
+	_ = h.bucket.Close()
 	_ = os.RemoveAll(h.dir)
 }
 
@@ -90,6 +90,9 @@ func (verifyAs) ErrorCheck(v *runtimevar.Variable, err error) error {
 	var perr *os.PathError
 	if !v.ErrorAs(err, &perr) {
 		return errors.New("runtimevar.ErrorAs failed with *os.PathError")
+	}
+	if !errors.As(err, &perr) {
+		return errors.New("errors.As failed with *os.PathError")
 	}
 	return nil
 }
@@ -153,7 +156,9 @@ func TestOpenVariable(t *testing.T) {
 			opener := &defaultOpener{}
 			defer func() {
 				if opener.opener != nil && opener.opener.Bucket != nil {
-					opener.opener.Bucket.Close()
+					if err := opener.opener.Bucket.Close(); err != nil {
+						t.Errorf("failed to Close: %v", err)
+					}
 				}
 			}()
 			u, err := url.Parse(test.URL)
@@ -162,7 +167,11 @@ func TestOpenVariable(t *testing.T) {
 			}
 			v, err := opener.OpenVariableURL(ctx, u)
 			if v != nil {
-				defer v.Close()
+				defer func(v *runtimevar.Variable) {
+					if err := v.Close(); err != nil {
+						t.Errorf("failed to Close: %v", err)
+					}
+				}(v)
 			}
 			if (err != nil) != test.WantErr {
 				t.Errorf("BucketURL %s URL %s: got error %v, want error %v", test.BucketURL, test.URL, err, test.WantErr)
@@ -170,7 +179,6 @@ func TestOpenVariable(t *testing.T) {
 			if err != nil {
 				return
 			}
-			defer v.Close()
 			snapshot, err := v.Watch(ctx)
 			if (err != nil) != test.WantWatchErr {
 				t.Errorf("BucketURL %s URL %s: got Watch error %v, want error %v", test.BucketURL, test.URL, err, test.WantWatchErr)

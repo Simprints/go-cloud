@@ -42,6 +42,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -147,13 +148,13 @@ func (o *defaultDialer) OpenVariableURL(ctx context.Context, u *url.URL) (*runti
 		cfg := Config{Token: token, APIConfig: api.Config{Address: serverURL}}
 		client, err := Dial(ctx, &cfg)
 		if err != nil {
-			o.err = fmt.Errorf("failed to Dial default Vault server at %q: %v", serverURL, err)
+			o.err = fmt.Errorf("failed to Dial default Vault server at %q: %w", serverURL, err)
 			return
 		}
 		o.opener = &URLOpener{Client: client}
 	})
 	if o.err != nil {
-		return nil, fmt.Errorf("open variable %v: %v", u, o.err)
+		return nil, fmt.Errorf("open variable %v: %w", u, o.err)
 	}
 	return o.opener.OpenVariableURL(ctx, u)
 }
@@ -188,7 +189,7 @@ func (o *URLOpener) OpenVariableURL(ctx context.Context, u *url.URL) (*runtimeva
 	q.Del("decoder")
 	decoder, err := runtimevar.DecoderByName(ctx, decoderName, o.Decoder)
 	if err != nil {
-		return nil, fmt.Errorf("open variable %v: invalid decoder: %v", u, err)
+		return nil, fmt.Errorf("open variable %v: invalid decoder: %w", u, err)
 	}
 
 	opts := o.Options
@@ -197,7 +198,7 @@ func (o *URLOpener) OpenVariableURL(ctx context.Context, u *url.URL) (*runtimeva
 		q.Del("wait")
 		d, err := time.ParseDuration(s)
 		if err != nil {
-			return nil, fmt.Errorf("open variable %v: invalid wait %q: %v", u, s, err)
+			return nil, fmt.Errorf("open variable %v: invalid wait %q: %w", u, s, err)
 		}
 		opts.WaitDuration = d
 	}
@@ -271,11 +272,15 @@ func newWatcher(client *api.Client, secretPath string, decoder *runtimevar.Decod
 		mount = "secret"
 	}
 
-	var fullPath string
+	var prefix string
 	if engineVersion == 2 {
-		fullPath = path.Join(mount, "data", secretPath)
+		prefix = path.Join(mount, "data")
 	} else {
-		fullPath = path.Join(mount, secretPath)
+		prefix = mount
+	}
+	fullPath, err := vaultPath(prefix, secretPath)
+	if err != nil {
+		return nil, err
 	}
 
 	return &watcher{
@@ -286,6 +291,20 @@ func newWatcher(client *api.Client, secretPath string, decoder *runtimevar.Decod
 		engineVersion: engineVersion,
 		mount:         mount,
 	}, nil
+}
+
+// vaultPath joins prefix and secretPath into a Vault API path, and verifies
+// that the result is actually inside prefix. path.Join cleans ".." segments,
+// so a secretPath such as "../../sys/health" would otherwise silently make
+// the request escape the intended mount -- something Vault's own
+// path-prefix-scoped ACL policies can't defend against, since as far as
+// Vault is concerned it's simply the path the client asked for.
+func vaultPath(prefix, secretPath string) (string, error) {
+	p := path.Join(prefix, secretPath)
+	if p != prefix && !strings.HasPrefix(p, prefix+"/") {
+		return "", fmt.Errorf("hashivault: secret path %q escapes the %q mount", secretPath, prefix)
+	}
+	return p, nil
 }
 
 type state struct {

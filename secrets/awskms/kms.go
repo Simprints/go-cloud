@@ -38,7 +38,6 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -69,11 +68,7 @@ var DialV2 = Dial
 
 // lazySessionOpener obtains the AWS session from the environment on the first
 // call to OpenKeeperURL.
-type lazySessionOpener struct {
-	init   sync.Once
-	opener *URLOpener
-	err    error
-}
+type lazySessionOpener struct{}
 
 func (o *lazySessionOpener) OpenKeeperURL(ctx context.Context, u *url.URL) (*secrets.Keeper, error) {
 	opener := &URLOpener{}
@@ -137,7 +132,7 @@ func (o *URLOpener) OpenKeeperURL(ctx context.Context, u *url.URL) (*secrets.Kee
 
 	cfg, err := gcaws.V2ConfigFromURLParams(ctx, queryParams)
 	if err != nil {
-		return nil, fmt.Errorf("open keeper %v: %v", u, err)
+		return nil, fmt.Errorf("open keeper %v: %w", u, err)
 	}
 	client, err := Dial(cfg)
 	if err != nil {

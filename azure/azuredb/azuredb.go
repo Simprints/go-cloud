@@ -56,24 +56,27 @@ func (cf *CertFetcher) AzureCertPool(ctx context.Context) (*x509.CertPool, error
 }
 
 // Fetch fetches the Azure CA certificates. It is safe to call from multiple goroutines.
-func (cf *CertFetcher) Fetch(ctx context.Context) ([]*x509.Certificate, error) {
+func (cf *CertFetcher) Fetch(ctx context.Context) (certs []*x509.Certificate, err error) {
 	client := cf.Client
 	if client == nil {
 		client = http.DefaultClient
 	}
 	resp, err := ctxhttp.Get(ctx, client, caBundleURL)
 	if err != nil {
-		return nil, fmt.Errorf("fetch Azure certificates: %v", err)
+		return nil, fmt.Errorf("fetch Azure certificates: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if e := resp.Body.Close(); e != nil && err == nil {
+			err = e
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch Azure certificates: HTTP %s", resp.Status)
 	}
 	pemData, err := io.ReadAll(&io.LimitedReader{R: resp.Body, N: 1 << 20}) // limit to 1MiB
 	if err != nil {
-		return nil, fmt.Errorf("fetch Azure certificates: %v", err)
+		return nil, fmt.Errorf("fetch Azure certificates: %w", err)
 	}
-	var certs []*x509.Certificate
 	for len(pemData) > 0 {
 		var block *pem.Block
 		block, pemData = pem.Decode(pemData)
@@ -85,7 +88,7 @@ func (cf *CertFetcher) Fetch(ctx context.Context) ([]*x509.Certificate, error) {
 		}
 		c, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("fetch Azure certificates: %v", err)
+			return nil, fmt.Errorf("fetch Azure certificates: %w", err)
 		}
 		certs = append(certs, c)
 	}

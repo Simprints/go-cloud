@@ -50,7 +50,7 @@ func (uo *URLOpener) OpenMySQLURL(_ context.Context, u *url.URL) (*sql.DB, error
 	}
 	c, err := mysql.NewConnector(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("mysql: could not create connector: %v", err)
+		return nil, fmt.Errorf("mysql: could not create connector: %w", err)
 	}
 	return otelsql.OpenDB(c, uo.TraceOpts...), nil
 }
@@ -78,7 +78,15 @@ func ConfigFromURL(u *url.URL) (cfg *mysql.Config, err error) {
 	cfg.User = u.User.Username()
 	cfg.Passwd, _ = u.User.Password()
 	cfg.DBName = dbName
-	cfg.AllowCleartextPasswords = true
+	if _, ok := u.Query()["allowCleartextPasswords"]; !ok {
+		// The cleartext auth plugin hands the password to whatever answers on
+		// the database address, so it is only safe once the server's identity
+		// has been verified. Enable it by default only when the connection is
+		// TLS-protected with certificate verification and no plaintext
+		// fallback; otherwise applications must opt in explicitly with
+		// "allowCleartextPasswords=true".
+		cfg.AllowCleartextPasswords = cfg.TLS != nil && !cfg.TLS.InsecureSkipVerify && !cfg.AllowFallbackToPlaintext
+	}
 	cfg.AllowNativePasswords = true
 	return cfg, nil
 }

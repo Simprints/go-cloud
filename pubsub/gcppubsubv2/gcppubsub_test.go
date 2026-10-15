@@ -37,6 +37,20 @@ import (
 // --record.
 const projectID = "go-cloud-test-216917"
 
+func shutdownTopic(ctx context.Context, t testing.TB, topic *pubsub.Topic) {
+	t.Helper()
+	if err := topic.Shutdown(ctx); err != nil {
+		t.Errorf("failed to Shutdown topic: %v", err)
+	}
+}
+
+func shutdownSubscription(ctx context.Context, t testing.TB, sub *pubsub.Subscription) {
+	t.Helper()
+	if err := sub.Shutdown(ctx); err != nil {
+		t.Errorf("failed to Shutdown subscription: %v", err)
+	}
+}
+
 type harness struct {
 	closer    func()
 	client    *raw.Client
@@ -49,7 +63,7 @@ func newHarness(ctx context.Context, t *testing.T) (drivertest.Harness, error) {
 
 	client, err := Client(ctx, projectID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("making client: %v", err)
+		return nil, fmt.Errorf("making client: %w", err)
 	}
 	return &harness{closer: func() {}, client: client, numTopics: 0, numSubs: 0}, nil
 }
@@ -136,7 +150,7 @@ func (h *harness) MakeNonexistentSubscription(ctx context.Context) (driver.Subsc
 }
 
 func (h *harness) Close() {
-	h.client.Close()
+	_ = h.client.Close()
 	h.closer()
 }
 
@@ -180,7 +194,7 @@ func BenchmarkGcpPubSub(b *testing.B) {
 	}
 	defer cleanup1()
 	topic := pubsub.NewTopic(dt, nil)
-	defer topic.Shutdown(ctx)
+	defer shutdownTopic(ctx, b, topic)
 
 	// Make subscription.
 	subName := fmt.Sprintf("%s-subscription", b.Name())
@@ -190,7 +204,7 @@ func BenchmarkGcpPubSub(b *testing.B) {
 	}
 	defer cleanup2()
 	sub := pubsub.NewSubscription(ds, defaultRecvBatcherOpts, ackBatcherOpts)
-	defer sub.Shutdown(ctx)
+	defer shutdownSubscription(ctx, b, sub)
 
 	drivertest.RunBenchmarks(b, topic, sub)
 }
@@ -228,7 +242,7 @@ func (gcpAsTest) SubscriptionCheck(sub *pubsub.Subscription) error {
 func (gcpAsTest) TopicErrorCheck(t *pubsub.Topic, err error) error {
 	var s *status.Status
 	if !t.ErrorAs(err, &s) {
-		return fmt.Errorf("failed to convert %v (%T) to a gRPC Status", err, err)
+		return fmt.Errorf("failed to convert %w (%T) to a gRPC Status", err, err)
 	}
 	if s.Code() != codes.NotFound {
 		return fmt.Errorf("got code %s, want NotFound", s.Code())
@@ -239,7 +253,7 @@ func (gcpAsTest) TopicErrorCheck(t *pubsub.Topic, err error) error {
 func (gcpAsTest) SubscriptionErrorCheck(sub *pubsub.Subscription, err error) error {
 	var s *status.Status
 	if !sub.ErrorAs(err, &s) {
-		return fmt.Errorf("failed to convert %v (%T) to a gRPC Status", err, err)
+		return fmt.Errorf("failed to convert %w (%T) to a gRPC Status", err, err)
 	}
 	if s.Code() != codes.NotFound {
 		return fmt.Errorf("got code %s, want NotFound", s.Code())
@@ -299,7 +313,7 @@ func TestOpenTopic(t *testing.T) {
 		t.Fatal(err)
 	}
 	topic := OpenTopic(client, "my-topic", nil)
-	defer topic.Shutdown(ctx)
+	defer shutdownTopic(ctx, t, topic)
 	err = topic.Send(ctx, &pubsub.Message{Body: []byte("hello world")})
 	if err == nil {
 		t.Error("got nil, want error")
@@ -310,7 +324,7 @@ func TestOpenTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer topic.Shutdown(ctx)
+	defer shutdownTopic(ctx, t, topic)
 	err = topic.Send(ctx, &pubsub.Message{Body: []byte("hello world")})
 	if err == nil {
 		t.Error("got nil, want error")
@@ -343,7 +357,7 @@ func TestOpenSubscription(t *testing.T) {
 		t.Fatal(err)
 	}
 	sub := OpenSubscription(client, "my-subscription", nil)
-	defer sub.Shutdown(ctx)
+	defer shutdownSubscription(ctx, t, sub)
 	_, err = sub.Receive(ctx)
 	if err == nil {
 		t.Error("got nil, want error")
@@ -354,7 +368,7 @@ func TestOpenSubscription(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sub.Shutdown(ctx)
+	defer shutdownSubscription(ctx, t, sub)
 	_, err = sub.Receive(ctx)
 	if err == nil {
 		t.Error("got nil, want error")
@@ -396,7 +410,7 @@ func TestOpenTopicFromURL(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if topic != nil {
-			topic.Shutdown(ctx)
+			shutdownTopic(ctx, t, topic)
 		}
 	}
 }
@@ -430,7 +444,7 @@ func TestOpenSubscriptionFromURL(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if sub != nil {
-			sub.Shutdown(ctx)
+			shutdownSubscription(ctx, t, sub)
 		}
 	}
 }

@@ -28,7 +28,7 @@
 // # As
 //
 // gcpkms exposes the following type for As:
-//   - Error: *google.golang.org/grpc/status.Status
+//   - Error: *google.golang.org/grpc/status.Status (note: does not work with errors.As, because it's not an error)
 package gcpkms // import "gocloud.dev/secrets/gcpkms"
 
 import (
@@ -58,7 +58,7 @@ const endPoint = "cloudkms.googleapis.com:443"
 // the client after used.
 func Dial(ctx context.Context, ts gcp.TokenSource) (*cloudkms.KeyManagementClient, func(), error) {
 	c, err := cloudkms.NewKeyManagementClient(ctx, option.WithTokenSource(ts), useragent.ClientOption("secrets"))
-	return c, func() { c.Close() }, err
+	return c, func() { _ = c.Close() }, err
 }
 
 func init() {
@@ -95,7 +95,7 @@ func (o *lazyCredsOpener) OpenKeeperURL(ctx context.Context, u *url.URL) (*secre
 		o.opener = &URLOpener{Client: client}
 	})
 	if o.err != nil {
-		return nil, fmt.Errorf("open keeper %v: %v", u, o.err)
+		return nil, fmt.Errorf("open keeper %v: %w", u, o.err)
 	}
 	return o.opener.OpenKeeperURL(ctx, u)
 }

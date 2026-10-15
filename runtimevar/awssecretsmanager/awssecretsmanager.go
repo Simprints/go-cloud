@@ -40,7 +40,6 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -90,11 +89,7 @@ type URLOpener struct {
 
 // lazySessionOpener obtains the AWS session from the environment on the first
 // call to OpenVariableURL.
-type lazySessionOpener struct {
-	init   sync.Once
-	opener *URLOpener
-	err    error
-}
+type lazySessionOpener struct{}
 
 func (o *lazySessionOpener) OpenVariableURL(ctx context.Context, u *url.URL) (*runtimevar.Variable, error) {
 	opener := &URLOpener{}
@@ -113,20 +108,20 @@ func (o *URLOpener) OpenVariableURL(ctx context.Context, u *url.URL) (*runtimeva
 	q.Del("decoder")
 	decoder, err := runtimevar.DecoderByName(ctx, decoderName, o.Decoder)
 	if err != nil {
-		return nil, fmt.Errorf("open variable %v: invalid decoder: %v", u, err)
+		return nil, fmt.Errorf("open variable %v: invalid decoder: %w", u, err)
 	}
 	opts := o.Options
 	if s := q.Get("wait"); s != "" {
 		q.Del("wait")
 		d, err := time.ParseDuration(s)
 		if err != nil {
-			return nil, fmt.Errorf("open variable %v: invalid wait %q: %v", u, s, err)
+			return nil, fmt.Errorf("open variable %v: invalid wait %q: %w", u, s, err)
 		}
 		opts.WaitDuration = d
 	}
 	cfg, err := gcaws.V2ConfigFromURLParams(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("open variable %v: %v", u, err)
+		return nil, fmt.Errorf("open variable %v: %w", u, err)
 	}
 	return OpenVariable(secretsmanager.NewFromConfig(cfg), path.Join(u.Host, u.Path), decoder, &opts)
 }

@@ -46,7 +46,7 @@
 //   - Message.BeforeSend: *pb.PubsubMessage
 //   - Message.AfterSend: *string for the pb.PublishResponse.MessageIds entry corresponding to the message.
 //   - Message: *pb.PubsubMessage, *pb.ReceivedMessage
-//   - Error: *google.golang.org/grpc/status.Status
+//   - Error: *google.golang.org/grpc/status.Status (note: does not work with errors.As, because it's not an error)
 package gcppubsub // import "gocloud.dev/pubsub/gcppubsub"
 
 import (
@@ -86,9 +86,9 @@ var sendBatcherOpts = &batcher.Options{
 	MaxHandlers:  2,
 	// The PubSub service limits the size of the request body in a single Publish RPC.
 	// The limit is currently documented as "10MB (total size)" and "10MB (data field)" per message.
-	// We are enforcing 9MiB to give ourselves some headroom for message attributes since those
+	// We are enforcing 8MiB to give ourselves some headroom for message attributes since those
 	// are currently not considered when computing the byte size of a message.
-	MaxBatchByteSize: 9 * 1024 * 1024,
+	MaxBatchByteSize: 8 * 1024 * 1024,
 }
 
 var defaultRecvBatcherOpts = &batcher.Options{
@@ -163,7 +163,7 @@ func (o *lazyCredsOpener) defaultConn(ctx context.Context) (*URLOpener, error) {
 func (o *lazyCredsOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubsub.Topic, error) {
 	opener, err := o.defaultConn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("open topic %v: failed to open default connection: %v", u, err)
+		return nil, fmt.Errorf("open topic %v: failed to open default connection: %w", u, err)
 	}
 	return opener.OpenTopicURL(ctx, u)
 }
@@ -171,7 +171,7 @@ func (o *lazyCredsOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubsub
 func (o *lazyCredsOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsub.Subscription, error) {
 	opener, err := o.defaultConn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("open subscription %v: failed to open default connection: %v", u, err)
+		return nil, fmt.Errorf("open subscription %v: failed to open default connection: %w", u, err)
 	}
 	return opener.OpenSubscriptionURL(ctx, u)
 }
@@ -212,7 +212,7 @@ func (o *URLOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubsub.Topic
 		case "max_send_batch_size":
 			maxBatchSize, err := queryParameterInt(value)
 			if err != nil {
-				return nil, fmt.Errorf("open topic %v: invalid query parameter %q: %v", u, param, err)
+				return nil, fmt.Errorf("open topic %v: invalid query parameter %q: %w", u, param, err)
 			}
 
 			if maxBatchSize <= 0 || maxBatchSize > 1000 {
@@ -247,7 +247,7 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 		case "max_recv_batch_size":
 			maxBatchSize, err := queryParameterInt(value)
 			if err != nil {
-				return nil, fmt.Errorf("open subscription %v: invalid query parameter %q: %v", u, param, err)
+				return nil, fmt.Errorf("open subscription %v: invalid query parameter %q: %w", u, param, err)
 			}
 
 			if maxBatchSize <= 0 || maxBatchSize > 1000 {
@@ -259,7 +259,7 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 			var err error
 			nackLazy, err := queryParameterBool(value)
 			if err != nil {
-				return nil, fmt.Errorf("open subscription %v: invalid query parameter %q: %v", u, param, err)
+				return nil, fmt.Errorf("open subscription %v: invalid query parameter %q: %w", u, param, err)
 			}
 			opts.NackLazy = nackLazy
 		default:
@@ -303,7 +303,7 @@ func Dial(ctx context.Context, ts gcp.TokenSource) (*grpc.ClientConn, func(), er
 	if err != nil {
 		return nil, nil, err
 	}
-	return conn, func() { conn.Close() }, nil
+	return conn, func() { _ = conn.Close() }, nil
 }
 
 // dialEmulator opens a gRPC connection to the GCP Pub Sub API.
