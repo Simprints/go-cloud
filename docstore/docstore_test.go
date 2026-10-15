@@ -16,6 +16,8 @@ package docstore
 
 import (
 	"context"
+	"errors"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -49,9 +51,15 @@ func TestIsIncNumber(t *testing.T) {
 	}
 }
 
+func closeWithErrorCheck(t *testing.T, c io.Closer) {
+	if err := c.Close(); err != nil {
+		t.Errorf("failed to close: %v", err)
+	}
+}
+
 func TestActionsDo(t *testing.T) {
 	c := newCollection(fakeDriverCollection{})
-	defer c.Close()
+	defer closeWithErrorCheck(t, c)
 	dn := map[string]any{"key": nil}
 	d1 := map[string]any{"key": 1}
 	d2 := map[string]any{"key": 2}
@@ -118,10 +126,7 @@ func TestClosedErrors(t *testing.T) {
 
 	check := func(err error) {
 		t.Helper()
-		if alerr, ok := err.(ActionListError); ok {
-			err = alerr.Unwrap()
-		}
-		if err != errClosed {
+		if !errors.Is(err, errClosed) {
 			t.Errorf("got %v, want errClosed", err)
 		}
 	}
@@ -142,7 +147,7 @@ func TestClosedErrors(t *testing.T) {
 	// in the middle of the iteration.
 	c = NewCollection(fakeDriverCollection{})
 	iter = c.Query().Get(ctx)
-	c.Close()
+	closeWithErrorCheck(t, c)
 	check(iter.Next(ctx, doc))
 }
 

@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -152,7 +151,10 @@ func (asTest) SubscriptionCheck(sub *pubsub.Subscription) error {
 func (asTest) TopicErrorCheck(t *pubsub.Topic, err error) error {
 	var pe sarama.ProducerErrors
 	if !t.ErrorAs(err, &pe) {
-		return fmt.Errorf("failed to convert %v (%T)", err, err)
+		return fmt.Errorf("failed to convert %w (%T)", err, err)
+	}
+	if !errors.As(err, &pe) {
+		return fmt.Errorf("failed to use errors.As to convert %w (%T)", err, err)
 	}
 	return nil
 }
@@ -160,7 +162,10 @@ func (asTest) TopicErrorCheck(t *pubsub.Topic, err error) error {
 func (asTest) SubscriptionErrorCheck(s *pubsub.Subscription, err error) error {
 	var ke sarama.KError
 	if !s.ErrorAs(err, &ke) {
-		return fmt.Errorf("failed to convert %v (%T)", err, err)
+		return fmt.Errorf("failed to convert %w (%T)", err, err)
+	}
+	if !errors.As(err, &ke) {
+		return fmt.Errorf("failed to use errors.As to convert %w (%T)", err, err)
 	}
 	return nil
 }
@@ -241,7 +246,7 @@ func TestKafkaKey(t *testing.T) {
 			}
 			gotKeyBytes, err := pm.Key.Encode()
 			if err != nil {
-				return fmt.Errorf("failed to Encode Kafka Key: %v", err)
+				return fmt.Errorf("failed to Encode Kafka Key: %w", err)
 			}
 			if gotKey := string(gotKeyBytes); gotKey != keyValue {
 				return errors.New("Kafka key wasn't set appropriately")
@@ -455,17 +460,8 @@ func BenchmarkKafka(b *testing.B) {
 	drivertest.RunBenchmarks(b, topic, sub)
 }
 
-func fakeConnectionStringInEnv() func() {
-	oldEnvVal := os.Getenv("KAFKA_BROKERS")
-	os.Setenv("KAFKA_BROKERS", "localhost:10000")
-	return func() {
-		os.Setenv("KAFKA_BROKERS", oldEnvVal)
-	}
-}
-
 func TestOpenTopicFromURL(t *testing.T) {
-	cleanup := fakeConnectionStringInEnv()
-	defer cleanup()
+	t.Setenv("KAFKA_BROKERS", "localhost:10000")
 
 	tests := []struct {
 		URL     string
@@ -501,8 +497,7 @@ func TestOpenTopicFromURL(t *testing.T) {
 }
 
 func TestOpenSubscriptionFromURL(t *testing.T) {
-	cleanup := fakeConnectionStringInEnv()
-	defer cleanup()
+	t.Setenv("KAFKA_BROKERS", "localhost:10000")
 
 	tests := []struct {
 		URL     string

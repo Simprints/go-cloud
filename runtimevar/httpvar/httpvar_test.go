@@ -102,7 +102,11 @@ func (verifyAs) SnapshotCheck(s *runtimevar.Snapshot) error {
 func (verifyAs) ErrorCheck(v *runtimevar.Variable, err error) error {
 	var e RequestError
 	if !v.ErrorAs(err, &e) {
-		return errors.New("ErrorAs expected to succeed with *httpvar.RequestError")
+		return errors.New("ErrorAs expected to succeed with httpvar.RequestError")
+	}
+	var ep *RequestError
+	if !errors.As(err, &ep) {
+		return errors.New("errors.As succeed with *httpvar.RequestError")
 	}
 	if !strings.Contains(e.Error(), strconv.Itoa(e.Response.StatusCode)) {
 		return errors.New("should contain url and status code")
@@ -111,7 +115,11 @@ func (verifyAs) ErrorCheck(v *runtimevar.Variable, err error) error {
 	var e2 url.Error
 	urlError := &url.Error{URL: "http://example.com", Op: "GET", Err: errors.New("example error")}
 	if !v.ErrorAs(urlError, &e2) {
-		return errors.New("ErrorAs expected to succeed with *url.Error")
+		return errors.New("ErrorAs expected to succeed with url.Error")
+	}
+	var e2p *url.Error
+	if !errors.As(urlError, &e2p) {
+		return errors.New("errors.As succeed with *url.Error")
 	}
 
 	var e3 RequestError
@@ -138,7 +146,9 @@ func TestOpenVariable(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if v != nil {
-			v.Close()
+			if err := v.Close(); err != nil {
+				t.Errorf("failed to Close: %v", err)
+			}
 		}
 	}
 }
@@ -186,7 +196,11 @@ func TestWatcher_ErrorCode(t *testing.T) {
 	}
 
 	watcher := newWatcher(http.DefaultClient, endpointURL, runtimevar.StringDecoder, nil)
-	defer watcher.Close()
+	defer func() {
+		if err := watcher.Close(); err != nil {
+			t.Errorf("failed to Close: %v", err)
+		}
+	}()
 	for _, test := range tests {
 		actualGCErr := watcher.ErrorCode(test.Err)
 		if test.GCErr != actualGCErr {
@@ -208,7 +222,11 @@ func TestWatcher_WatchVariable(t *testing.T) {
 			Timeout: time.Duration(1 * time.Millisecond),
 		}
 		watcher := newWatcher(httpClient, endpointURL, runtimevar.StringDecoder, nil)
-		defer watcher.Close()
+		defer func() {
+			if err := watcher.Close(); err != nil {
+				t.Errorf("failed to Close: %v", err)
+			}
+		}()
 		state, _ := watcher.WatchVariable(context.Background(), &state{})
 
 		val, err := state.Value()
@@ -267,7 +285,11 @@ func TestWithAuth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed OpenVariable: %v", err)
 			}
-			defer v.Close()
+			defer func(v *runtimevar.Variable) {
+				if err := v.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}(v)
 			snapshot, err := v.Watch(ctx)
 			if (err != nil) != test.WantErr {
 				t.Errorf("got Watch error %v, want error %v", err, test.WantErr)
@@ -329,7 +351,11 @@ func TestOpenVariableURL(t *testing.T) {
 			if err != nil {
 				return
 			}
-			defer v.Close()
+			defer func(v *runtimevar.Variable) {
+				if err := v.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}(v)
 			snapshot, err := v.Watch(ctx)
 			if (err != nil) != test.WantWatchErr {
 				t.Errorf("%s: got Watch error %v, want error %v", test.URL, err, test.WantWatchErr)
@@ -377,7 +403,7 @@ func newMockServer() *mockServer {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		fmt.Fprint(w, resp)
+		_, _ = fmt.Fprint(w, resp)
 	})
 
 	server := httptest.NewServer(mux)

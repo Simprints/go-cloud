@@ -99,6 +99,9 @@ func (va verifyAs) ErrorCheck(v *runtimevar.Variable, err error) error {
 	if !v.ErrorAs(err, &e) {
 		return errors.New("Keeper.ErrorAs failed")
 	}
+	if !errors.As(err, &e) {
+		return errors.New("errors.As failed")
+	}
 	return nil
 }
 
@@ -132,7 +135,9 @@ func TestOpenVariable(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if err == nil {
-			v.Close()
+			if err := v.Close(); err != nil {
+				t.Errorf("failed to Close: %v", err)
+			}
 		}
 	}
 }

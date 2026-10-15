@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Disable "not used" linters.
+//
+//nolint:unused
 package azureblob
 
 import (
@@ -134,6 +137,9 @@ func (h *harness) MakeDriverForNonexistentBucket(ctx context.Context) (driver.Bu
 	return openBucket(ctx, client, nil)
 }
 
+func (*harness) SupportsCopy() bool               { return true }
+func (*harness) SupportsNonSlashDelimiters() bool { return true }
+
 func (h *harness) Close() {
 	h.closer()
 }
@@ -206,6 +212,14 @@ func (verifyContentLanguage) BeforeCopy(as func(any) bool) error {
 	var co *azblobblob.StartCopyFromURLOptions
 	if !as(&co) {
 		return errors.New("BeforeCopy.As failed")
+	}
+	return nil
+}
+
+func (verifyContentLanguage) BeforeDelete(as func(any) bool) error {
+	var azOpts *azblobblob.DeleteOptions
+	if !as(&azOpts) {
+		return errors.New("BeforeDelete.As failed")
 	}
 	return nil
 }
@@ -301,7 +315,11 @@ func TestOpenBucket(t *testing.T) {
 			// Create portable type.
 			b, err := OpenBucket(ctx, client, nil)
 			if b != nil {
-				defer b.Close()
+				defer func(b *blob.Bucket) {
+					if err := b.Close(); err != nil {
+						t.Errorf("failed to Close: %v", err)
+					}
+				}(b)
 			}
 			if (err != nil) != test.wantErr {
 				t.Errorf("got err %v want error %v", err, test.wantErr)
@@ -668,10 +686,68 @@ func TestOpenBucketFromURL(t *testing.T) {
 	for _, test := range tests {
 		b, err := blob.OpenBucket(ctx, test.URL)
 		if b != nil {
-			defer b.Close()
+			defer func(b *blob.Bucket) {
+				if err := b.Close(); err != nil {
+					t.Errorf("failed to Close: %v", err)
+				}
+			}(b)
 		}
 		if (err != nil) != test.WantErr {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 	}
+}
+
+func TestLazyOpenerRejectsSASEndpointOverrides(t *testing.T) {
+	t.Setenv("AZURE_STORAGE_ACCOUNT", "my-account")
+	t.Setenv("AZURE_STORAGE_SAS_TOKEN", "sig=secret")
+
+	for _, tc := range []struct {
+		name    string
+		rawURL  string
+		wantErr bool
+	}{
+		{"default", "azblob://mybucket", false},
+		{"same domain", "azblob://mybucket?domain=blob.core.windows.net", false},
+		{"same protocol", "azblob://mybucket?protocol=https", false},
+		{"domain", "azblob://mybucket?domain=storage.example.com", true},
+		{"protocol", "azblob://mybucket?protocol=http", true},
+		{"storage account", "azblob://mybucket?storage_account=other-account", true},
+		{"cdn", "azblob://mybucket?cdn=true", true},
+		{"local emulator", "azblob://mybucket?localemu=true", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(tc.rawURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, err := new(lazyOpener).OpenBucketURL(context.Background(), u)
+			if b != nil {
+				defer func() { _ = b.Close() }()
+			}
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("got error %v, want error %v", err, tc.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), "cannot change the service endpoint") {
+				t.Fatalf("got error %q, want endpoint override error", err)
+			}
+		})
+	}
+}
+
+func TestLazyOpenerAllowsSASConfiguredEndpoint(t *testing.T) {
+	t.Setenv("AZURE_STORAGE_ACCOUNT", "my-account")
+	t.Setenv("AZURE_STORAGE_SAS_TOKEN", "sig=secret")
+	t.Setenv("AZURE_STORAGE_DOMAIN", "storage.example.com")
+	t.Setenv("AZURE_STORAGE_PROTOCOL", "http")
+
+	u, err := url.Parse("azblob://mybucket")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := new(lazyOpener).OpenBucketURL(context.Background(), u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close() }()
 }

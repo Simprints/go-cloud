@@ -400,7 +400,7 @@ func TestErrorsAreWrapped(t *testing.T) {
 	verifyWrap := func(description string, err error) {
 		if unwrapped, ok := err.(*gcerr.Error); !ok {
 			t.Errorf("%s: not wrapped: %v", description, err)
-		} else if du, ok := unwrapped.Unwrap().(*gcerr.Error); ok {
+		} else if du, ok := unwrapped.Unwrap()[0].(*gcerr.Error); ok {
 			t.Errorf("%s: double wrapped: %v", description, du)
 		}
 	}
@@ -411,11 +411,6 @@ func TestErrorsAreWrapped(t *testing.T) {
 	err = v.Close()
 	verifyWrap("Close", err)
 }
-
-var (
-	testOpenOnce sync.Once
-	testOpenGot  *url.URL
-)
 
 func TestURLMux(t *testing.T) {
 	ctx := context.Background()
@@ -633,6 +628,21 @@ func TestBytesDecoder(t *testing.T) {
 	}
 	if diff := cmp.Diff(got, input); diff != "" {
 		t.Errorf("output got %v, want %q", got, input)
+	}
+	// Mutating the decoded output must not mutate the input.
+	got.([]byte)[0] = 'J'
+	if input[0] != 'h' {
+		t.Errorf("BytesDecode aliases input: input=%q after mutating output", input)
+	}
+	// Mutating the input after decoding must not mutate the decoded output.
+	input2 := []byte("hello world")
+	got2, err := BytesDecoder.Decode(context.Background(), input2)
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	input2[0] = 'J'
+	if got2.([]byte)[0] != 'h' {
+		t.Errorf("BytesDecode aliases input: output=%q after mutating input", got2)
 	}
 }
 

@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -94,7 +93,7 @@ func newHarness(t *testing.T) (drivertest.Harness, error) {
 
 	_, err = c.Sys().Health()
 	if err != nil {
-		return nil, fmt.Errorf("vault server not healthy (run runtimevar/hashivault/localvault.sh): %v", err)
+		return nil, fmt.Errorf("vault server not healthy (run runtimevar/hashivault/localvault.sh): %w", err)
 	}
 
 	return &harness{client: c}, nil
@@ -122,6 +121,9 @@ func (verifyAs) ErrorCheck(v *runtimevar.Variable, err error) error {
 	var secErr *SecretError
 	if !v.ErrorAs(err, &secErr) {
 		return errors.New("ErrorAs expected to succeed with *SecretError")
+	}
+	if !errors.As(err, &secErr) {
+		return errors.New("errors.As succeed with *SecretError")
 	}
 	if secErr.Code != 404 {
 		return fmt.Errorf("expected SecretError code 404, got %d", secErr.Code)
@@ -260,6 +262,50 @@ func TestEngineVersionPaths(t *testing.T) {
 	}
 }
 
+func TestSecretPathEscape(t *testing.T) {
+	ctx := context.Background()
+	client, err := Dial(ctx, &Config{
+		Token: "fake",
+		APIConfig: api.Config{
+			Address: "http://localhost:8200",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		SecretPath string
+		WantPath   string // empty means an error is expected
+	}{
+		{"tenant-a/config", "secret/data/tenant-a/config"},
+		{"tenant-a/../tenant-b/config", "secret/data/tenant-b/config"}, // stays within the mount, allowed
+		{"../../sys/health", ""},
+		{"a/../../../auth/token/create", ""},
+		{"../secret/data/other-tenant", ""},
+	}
+
+	for _, test := range tests {
+		w, err := newWatcher(client, test.SecretPath, runtimevar.StringDecoder, nil)
+		if test.WantPath == "" {
+			if err == nil {
+				t.Errorf("SecretPath=%q: expected an error rejecting the escape, got none (path=%q)",
+					test.SecretPath, w.(*watcher).path)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("SecretPath=%q: newWatcher failed: %v", test.SecretPath, err)
+			continue
+		}
+		watcher := w.(*watcher)
+		if watcher.path != test.WantPath {
+			t.Errorf("SecretPath=%q: got path %q, want %q", test.SecretPath, watcher.path, test.WantPath)
+		}
+		w.Close()
+	}
+}
+
 func TestInvalidEngineVersion(t *testing.T) {
 	ctx := context.Background()
 	client, err := Dial(ctx, &Config{
@@ -278,49 +324,10 @@ func TestInvalidEngineVersion(t *testing.T) {
 	}
 }
 
-func fakeConnectionStringInEnv() func() {
-	oldURLVal := os.Getenv("VAULT_SERVER_URL")
-	oldTokenVal := os.Getenv("VAULT_SERVER_TOKEN")
-	os.Setenv("VAULT_SERVER_URL", "http://myvaultserver")
-	os.Setenv("VAULT_SERVER_TOKEN", "faketoken")
-	return func() {
-		os.Setenv("VAULT_SERVER_URL", oldURLVal)
-		os.Setenv("VAULT_SERVER_TOKEN", oldTokenVal)
-	}
-}
-
-func alternativeConnectionStringEnvVars() func() {
-	oldURLVal := os.Getenv("VAULT_ADDR")
-	oldTokenVal := os.Getenv("VAULT_TOKEN")
-	os.Setenv("VAULT_ADDR", "http://myalternativevaultserver")
-	os.Setenv("VAULT_TOKEN", "faketoken2")
-	return func() {
-		os.Setenv("VAULT_ADDR", oldURLVal)
-		os.Setenv("VAULT_TOKEN", oldTokenVal)
-	}
-}
-
-func unsetConnectionStringEnvVars() func() {
-	oldURLVal := os.Getenv("VAULT_ADDR")
-	oldTokenVal := os.Getenv("VAULT_TOKEN")
-	oldServerURLVal := os.Getenv("VAULT_SERVER_URL")
-	oldServerTokenVal := os.Getenv("VAULT_SERVER_TOKEN")
-	os.Unsetenv("VAULT_ADDR")
-	os.Unsetenv("VAULT_TOKEN")
-	os.Unsetenv("VAULT_SERVER_URL")
-	os.Unsetenv("VAULT_SERVER_TOKEN")
-	return func() {
-		os.Setenv("VAULT_ADDR", oldURLVal)
-		os.Setenv("VAULT_SERVER_URL", oldServerURLVal)
-		os.Setenv("VAULT_TOKEN", oldTokenVal)
-		os.Setenv("VAULT_SERVER_TOKEN", oldServerTokenVal)
-	}
-}
-
 func TestGetVaultConnectionDetails(t *testing.T) {
 	t.Run("Test Current Env Vars", func(t *testing.T) {
-		cleanup := fakeConnectionStringInEnv()
-		defer cleanup()
+		t.Setenv("VAULT_SERVER_URL", "http://myvaultserver")
+		t.Setenv("VAULT_SERVER_TOKEN", "faketoken")
 
 		serverURL, err := getVaultURL()
 		if err != nil {
@@ -337,8 +344,8 @@ func TestGetVaultConnectionDetails(t *testing.T) {
 	})
 
 	t.Run("Test Alternative Env Vars", func(t *testing.T) {
-		cleanup := alternativeConnectionStringEnvVars()
-		defer cleanup()
+		t.Setenv("VAULT_ADDR", "http://myalternativevaultserver")
+		t.Setenv("VAULT_TOKEN", "faketoken2")
 
 		serverURL, err := getVaultURL()
 		if err != nil {
@@ -355,8 +362,10 @@ func TestGetVaultConnectionDetails(t *testing.T) {
 	})
 
 	t.Run("Test Unset Env Vars Throws Error", func(t *testing.T) {
-		cleanup := unsetConnectionStringEnvVars()
-		defer cleanup()
+		t.Setenv("VAULT_ADDR", "")
+		t.Setenv("VAULT_TOKEN", "")
+		t.Setenv("VAULT_SERVER_URL", "")
+		t.Setenv("VAULT_SERVER_TOKEN", "")
 
 		serverURL, err := getVaultURL()
 		if err == nil {
@@ -371,8 +380,8 @@ func TestGetVaultConnectionDetails(t *testing.T) {
 }
 
 func TestOpenVariableURL(t *testing.T) {
-	cleanup := fakeConnectionStringInEnv()
-	defer cleanup()
+	t.Setenv("VAULT_SERVER_URL", "http://myvaultserver")
+	t.Setenv("VAULT_SERVER_TOKEN", "faketoken")
 
 	tests := []struct {
 		URL     string

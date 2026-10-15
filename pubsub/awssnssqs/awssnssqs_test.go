@@ -66,7 +66,19 @@ type harness struct {
 	topicAttributes map[string]string
 }
 
-type harnessOption func(h *harness)
+func shutdownTopic(ctx context.Context, t testing.TB, topic *pubsub.Topic) {
+	t.Helper()
+	if err := topic.Shutdown(ctx); err != nil {
+		t.Errorf("failed to Shutdown topic: %v", err)
+	}
+}
+
+func shutdownSubscription(ctx context.Context, t testing.TB, sub *pubsub.Subscription) {
+	t.Helper()
+	if err := sub.Shutdown(ctx); err != nil {
+		t.Errorf("failed to Shutdown subscription: %v", err)
+	}
+}
 
 func newHarness(ctx context.Context, t *testing.T, topicKind topicKind) (drivertest.Harness, error) {
 	t.Helper()
@@ -83,17 +95,6 @@ func (h *harness) CreateTopic(ctx context.Context, testName string) (dt driver.T
 	return createTopic(ctx, topicName, h.snsClient, h.sqsClient, h.topicKind, h.topicAttributes)
 }
 
-func convertStringToPtrMap(m map[string]string) map[string]*string {
-	if m == nil {
-		return nil
-	}
-	out := make(map[string]*string, len(m))
-	for k, v := range m {
-		out[k] = aws.String(v)
-	}
-	return out
-}
-
 func createTopic(ctx context.Context, topicName string, snsClient *sns.Client, sqsClient *sqs.Client, topicKind topicKind, attributes map[string]string) (dt driver.Topic, cleanup func(), err error) {
 	switch topicKind {
 	case topicKindSNS, topicKindSNSRaw:
@@ -101,22 +102,22 @@ func createTopic(ctx context.Context, topicName string, snsClient *sns.Client, s
 		input := &sns.CreateTopicInput{Name: aws.String(topicName), Attributes: attributes}
 		out, err := snsClient.CreateTopic(ctx, input)
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating SNS topic %q: %v", topicName, err)
+			return nil, nil, fmt.Errorf("creating SNS topic %q: %w", topicName, err)
 		}
 		dt = openSNSTopic(ctx, snsClient, *out.TopicArn, &TopicOptions{})
 		cleanup = func() {
-			snsClient.DeleteTopic(ctx, &sns.DeleteTopicInput{TopicArn: out.TopicArn})
+			_, _ = snsClient.DeleteTopic(ctx, &sns.DeleteTopicInput{TopicArn: out.TopicArn})
 		}
 		return dt, cleanup, nil
 	case topicKindSQS:
 		// Create an SQS queue.
 		qURL, _, err := createSQSQueue(ctx, sqsClient, topicName, attributes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating SQS queue %q: %v", topicName, err)
+			return nil, nil, fmt.Errorf("creating SQS queue %q: %w", topicName, err)
 		}
 		dt = openSQSTopic(ctx, sqsClient, qURL, &TopicOptions{})
 		cleanup = func() {
-			sqsClient.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: aws.String(qURL)})
+			_, _ = sqsClient.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: aws.String(qURL)})
 		}
 		return dt, cleanup, nil
 	default:
@@ -148,7 +149,7 @@ func createSubscription(ctx context.Context, dt driver.Topic, subName string, sn
 		// Create an SQS queue, and subscribe it to the SNS topic.
 		qURL, qARN, err := createSQSQueue(ctx, sqsClient, subName, nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating SQS queue %q: %v", subName, err)
+			return nil, nil, fmt.Errorf("creating SQS queue %q: %w", subName, err)
 		}
 		ds = openSubscription(ctx, sqsClient, qURL, &SubscriptionOptions{})
 
@@ -165,11 +166,11 @@ func createSubscription(ctx context.Context, dt driver.Topic, subName string, sn
 		}
 		out, err := snsClient.Subscribe(ctx, req)
 		if err != nil {
-			return nil, nil, fmt.Errorf("subscribing: %v", err)
+			return nil, nil, fmt.Errorf("subscribing: %w", err)
 		}
 		cleanup = func() {
-			snsClient.Unsubscribe(ctx, &sns.UnsubscribeInput{SubscriptionArn: out.SubscriptionArn})
-			sqsClient.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: aws.String(qURL)})
+			_, _ = snsClient.Unsubscribe(ctx, &sns.UnsubscribeInput{SubscriptionArn: out.SubscriptionArn})
+			_, _ = sqsClient.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: aws.String(qURL)})
 		}
 		return ds, cleanup, nil
 	case topicKindSQS:
@@ -185,7 +186,7 @@ func createSubscription(ctx context.Context, dt driver.Topic, subName string, sn
 func createSQSQueue(ctx context.Context, sqsClient *sqs.Client, topicName string, attributes map[string]string) (string, string, error) {
 	out, err := sqsClient.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: aws.String(topicName), Attributes: attributes})
 	if err != nil {
-		return "", "", fmt.Errorf("creating SQS queue %q: %v", topicName, err)
+		return "", "", fmt.Errorf("creating SQS queue %q: %w", topicName, err)
 	}
 	qURL := aws.ToString(out.QueueUrl)
 
@@ -195,7 +196,7 @@ func createSQSQueue(ctx context.Context, sqsClient *sqs.Client, topicName string
 		AttributeNames: []sqstypes.QueueAttributeName{"QueueArn"},
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("getting queue ARN for %s: %v", qURL, err)
+		return "", "", fmt.Errorf("getting queue ARN for %s: %w", qURL, err)
 	}
 	qARN := out2.Attributes["QueueArn"]
 
@@ -218,7 +219,7 @@ func createSQSQueue(ctx context.Context, sqsClient *sqs.Client, topicName string
 		Attributes: map[string]string{"Policy": queuePolicy},
 		QueueUrl:   aws.String(qURL),
 	}); err != nil {
-		return "", "", fmt.Errorf("setting policy: %v", err)
+		return "", "", fmt.Errorf("setting policy: %w", err)
 	}
 	return qURL, qARN, nil
 }
@@ -314,6 +315,9 @@ func (t awsAsTest) TopicErrorCheck(topic *pubsub.Topic, err error) error {
 	if !topic.ErrorAs(err, &e) {
 		return errors.New("Topic.ErrorAs failed")
 	}
+	if !errors.As(err, &e) {
+		return errors.New("errors.As failed")
+	}
 	switch t.topicKind {
 	case topicKindSNS, topicKindSNSRaw:
 		if got, want := e.ErrorCode(), (&snstypes.NotFoundException{}).ErrorCode(); want != got {
@@ -333,6 +337,9 @@ func (t awsAsTest) SubscriptionErrorCheck(s *pubsub.Subscription, err error) err
 	var e smithy.APIError
 	if !s.ErrorAs(err, &e) {
 		return errors.New("Subscription.ErrorAs failed")
+	}
+	if !errors.As(err, &e) {
+		return errors.New("errors.As failed")
 	}
 	if got, want := e.ErrorCode(), "AWS.SimpleQueueService.NonExistentQueue"; got != want {
 		return fmt.Errorf("got %q, want %q", got, want)
@@ -435,7 +442,7 @@ func benchmark(b *testing.B, topicKind topicKind) {
 		sendBatcherOpts = sendBatcherOptsSQS
 	}
 	topic := pubsub.NewTopic(dt, sendBatcherOpts)
-	defer topic.Shutdown(ctx)
+	defer shutdownTopic(ctx, b, topic)
 	subName := fmt.Sprintf("%s-subscription", b.Name())
 	ds, cleanup2, err := createSubscription(ctx, dt, subName, snsClient, sqsClient, topicKind)
 	if err != nil {
@@ -443,7 +450,7 @@ func benchmark(b *testing.B, topicKind topicKind) {
 	}
 	defer cleanup2()
 	sub := pubsub.NewSubscription(ds, recvBatcherOpts, ackBatcherOpts)
-	defer sub.Shutdown(ctx)
+	defer shutdownSubscription(ctx, b, sub)
 	drivertest.RunBenchmarks(b, topic, sub)
 }
 
@@ -477,7 +484,7 @@ func TestOpenTopicFromURL(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if topic != nil {
-			topic.Shutdown(ctx)
+			shutdownTopic(ctx, t, topic)
 		}
 	}
 }
@@ -516,7 +523,7 @@ func TestOpenSubscriptionFromURL(t *testing.T) {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
 		}
 		if sub != nil {
-			sub.Shutdown(ctx)
+			shutdownSubscription(ctx, t, sub)
 		}
 	}
 }
@@ -649,7 +656,7 @@ func testFIFOTopic(t *testing.T, kind topicKind) {
 			}
 			defer cleanup()
 			topic := pubsub.NewTopic(dt, sendBatcherOptsSNS)
-			defer topic.Shutdown(ctx)
+			defer shutdownTopic(ctx, t, topic)
 			ds, cleanup, err := h.CreateSubscription(ctx, dt, t.Name())
 			if err != nil {
 				t.Errorf("harness.CreateSubscription() error = %v", err)
@@ -657,7 +664,7 @@ func testFIFOTopic(t *testing.T, kind topicKind) {
 			}
 			defer cleanup()
 			sub := pubsub.NewSubscription(ds, recvBatcherOpts, ackBatcherOpts)
-			defer sub.Shutdown(ctx)
+			defer shutdownSubscription(ctx, t, sub)
 
 			// Send and receive the message.
 			err = topic.Send(ctx, tt.message)
@@ -677,6 +684,110 @@ func testFIFOTopic(t *testing.T, kind topicKind) {
 				t.Errorf("Received message body: -got, +want: %s", diff)
 			}
 			m.Ack()
+		})
+	}
+}
+
+func TestExtractBody(t *testing.T) {
+	const snsARN = "arn:aws:sns:us-east-2:456752665576:mytopic"
+	snsJSON := func(arn string) string {
+		return fmt.Sprintf(`{"Type":"Notification","MessageId":"abc","TopicArn":%q,"Timestamp":"2026-07-30T00:00:00.000Z","Message":"hello","MessageAttributes":{"a":{"Type":"String","Value":"1"}}}`, arn)
+	}
+	for _, tc := range []struct {
+		name        string
+		body        string
+		rawAttrs    map[string]string
+		raw         bool
+		snsTopicARN string
+		wantBody    string
+		wantAttrs   map[string]string
+	}{
+		{
+			name:      "SNS notification is unwrapped",
+			body:      snsJSON(snsARN),
+			wantBody:  "hello",
+			wantAttrs: map[string]string{"a": "1"},
+		},
+		{
+			name:        "SNS notification from the expected topic is unwrapped",
+			body:        snsJSON(snsARN),
+			snsTopicARN: snsARN,
+			wantBody:    "hello",
+			wantAttrs:   map[string]string{"a": "1"},
+		},
+		{
+			name:        "SNS notification from another topic is left alone",
+			body:        snsJSON("arn:aws:sns:us-east-2:456752665576:othertopic"),
+			snsTopicARN: snsARN,
+			wantBody:    snsJSON("arn:aws:sns:us-east-2:456752665576:othertopic"),
+			wantAttrs:   map[string]string{},
+		},
+		{
+			name:      "raw body with only a TopicArn field is left alone",
+			body:      `{"TopicArn":"user-supplied","order_id":42}`,
+			wantBody:  `{"TopicArn":"user-supplied","order_id":42}`,
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "forged envelope missing SNS fields cannot inject metadata",
+			body:      `{"TopicArn":"any","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantBody:  `{"TopicArn":"any","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantAttrs: map[string]string{},
+		},
+		{
+			// Boundary case: an envelope missing exactly one of the four
+			// required fields (here, MessageId) must still be rejected, to
+			// confirm all four are actually required rather than any subset.
+			name:      "envelope missing only MessageId is not unwrapped",
+			body:      `{"Type":"Notification","TopicArn":"any","Timestamp":"2026-07-30T00:00:00.000Z","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantBody:  `{"Type":"Notification","TopicArn":"any","Timestamp":"2026-07-30T00:00:00.000Z","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "envelope missing only Timestamp is not unwrapped",
+			body:      `{"Type":"Notification","MessageId":"abc","TopicArn":"any","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantBody:  `{"Type":"Notification","MessageId":"abc","TopicArn":"any","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "envelope with wrong Type is not unwrapped",
+			body:      `{"Type":"SubscriptionConfirmation","MessageId":"abc","TopicArn":"any","Timestamp":"2026-07-30T00:00:00.000Z","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantBody:  `{"Type":"SubscriptionConfirmation","MessageId":"abc","TopicArn":"any","Timestamp":"2026-07-30T00:00:00.000Z","Message":"x","MessageAttributes":{"role":{"Value":"admin"}}}`,
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "non-JSON body is left alone",
+			body:      "hello world",
+			wantBody:  "hello world",
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "Raw skips unwrapping entirely",
+			body:      snsJSON(snsARN),
+			raw:       true,
+			wantBody:  snsJSON(snsARN),
+			wantAttrs: map[string]string{},
+		},
+		{
+			name:      "top-level attributes mean the message is raw",
+			body:      snsJSON(snsARN),
+			rawAttrs:  map[string]string{"b": "2"},
+			wantBody:  snsJSON(snsARN),
+			wantAttrs: map[string]string{"b": "2"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := tc.rawAttrs
+			if attrs == nil {
+				attrs = map[string]string{}
+			}
+			gotBody, gotAttrs := extractBody(tc.body, attrs, tc.raw, tc.snsTopicARN)
+			if gotBody != tc.wantBody {
+				t.Errorf("body = %q; want %q", gotBody, tc.wantBody)
+			}
+			if diff := cmp.Diff(gotAttrs, tc.wantAttrs); diff != "" {
+				t.Errorf("attributes: -got, +want: %s", diff)
+			}
 		})
 	}
 }

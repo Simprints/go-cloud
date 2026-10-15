@@ -91,3 +91,66 @@ func TestConfigFromURL(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigFromURLCleartextPasswords(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		url  string
+		want bool
+	}{
+		{
+			name: "default, no TLS",
+			url:  "mysql://user:password@localhost/db",
+			want: false,
+		},
+		{
+			name: "default, no TLS, other query params present",
+			url:  "mysql://user:password@localhost/db?timeout=5s",
+			want: false,
+		},
+		{
+			name: "default, TLS with verification",
+			url:  "mysql://user:password@localhost/db?tls=true",
+			want: true,
+		},
+		{
+			name: "default, TLS without verification",
+			url:  "mysql://user:password@localhost/db?tls=skip-verify",
+			want: false,
+		},
+		{
+			name: "default, TLS with plaintext fallback",
+			url:  "mysql://user:password@localhost/db?tls=preferred",
+			want: false,
+		},
+		{
+			name: "explicit false",
+			url:  "mysql://user:password@localhost/db?allowCleartextPasswords=false",
+			want: false,
+		},
+		{
+			name: "explicit true",
+			url:  "mysql://user:password@localhost/db?allowCleartextPasswords=true",
+			want: true,
+		},
+		{
+			name: "explicit true without TLS",
+			url:  "mysql://user:password@localhost/db?allowCleartextPasswords=true&tls=false",
+			want: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(tc.url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := ConfigFromURL(u)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := cfg.AllowCleartextPasswords; got != tc.want {
+				t.Errorf("AllowCleartextPasswords = %v; want %v", got, tc.want)
+			}
+		})
+	}
+}

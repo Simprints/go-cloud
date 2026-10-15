@@ -16,6 +16,7 @@ package docstore_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -106,7 +107,7 @@ func ExampleOpenCollection() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer coll.Close()
+	defer func() { _ = coll.Close() }()
 
 	_ = coll // Use the collection.
 }
@@ -128,7 +129,7 @@ func ExampleCollection_As() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer coll.Close()
+	defer func() { _ = coll.Close() }()
 
 	// Try to access and use the underlying mongo.Collection.
 	var fsClient *firestore.Client
@@ -153,7 +154,7 @@ func ExampleCollection_ErrorAs() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer coll.Close()
+	defer func() { _ = coll.Close() }()
 
 	doc := map[string]any{"_id": "a"}
 	if err := coll.Create(ctx, doc); err != nil {
@@ -163,6 +164,8 @@ func ExampleCollection_ErrorAs() {
 		} else {
 			fmt.Println("could not convert error")
 		}
+		// Alternatively, using errors.As:
+		_ = errors.As(err, &aerr)
 	}
 }
 
@@ -196,7 +199,7 @@ func ExampleQuery_Get_full() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer coll.Close()
+	defer func() { _ = coll.Close() }()
 
 	// Add some documents to the collection.
 	err = coll.Actions().
@@ -239,7 +242,7 @@ func Example_optimisticLocking() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer coll.Close()
+	defer func() { _ = coll.Close() }()
 
 	// Create a player.
 	pat := &Player{Name: "Pat", Score: 7}
