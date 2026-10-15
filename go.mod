@@ -60,7 +60,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.26.2
 	github.com/lib/pq v1.12.3
 	github.com/samber/lo v1.53.0
-	go.mongodb.org/mongo-driver/v2 v2.5.0
+	go.mongodb.org/mongo-driver/v2 v2.9.2
 	go.opentelemetry.io/contrib/detectors/aws/ec2/v2 v2.6.0
 	go.opentelemetry.io/contrib/detectors/gcp v1.47.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
