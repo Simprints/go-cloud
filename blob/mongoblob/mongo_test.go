@@ -36,6 +36,14 @@ func (h *harness) HTTPClient() *http.Client {
 	return nil
 }
 
+func (h *harness) SupportsCopy() bool {
+	return true
+}
+
+func (h *harness) SupportsNonSlashDelimiters() bool {
+	return true
+}
+
 func (h *harness) Close() {}
 
 func TestConformance(t *testing.T) {
