@@ -159,9 +159,12 @@ func OpenCollectionWithIDFunc(mcoll *mongo.Collection, idFunc func(docstore.Docu
 }
 
 func newCollection(mcoll *mongo.Collection, idField string, idFunc func(docstore.Document) interface{}, opts *Options) (*collection, error) {
-	if opts == nil {
-		opts = &Options{}
+	// The collection has its own copy of the options: the caller's may be shared, e.g. by a URLOpener.
+	var o Options
+	if opts != nil {
+		o = *opts
 	}
+	opts = &o
 	if opts.RevisionField == "" {
 		opts.RevisionField = docstore.DefaultRevisionField
 	}

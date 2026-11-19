@@ -92,10 +92,23 @@ type URLOpener struct {
 
 // OpenCollectionURL opens the Collection URL.
 func (o *URLOpener) OpenCollectionURL(ctx context.Context, u *url.URL) (*docstore.Collection, error) {
+	c, err := o.newCollectionFromURL(u)
+	if err != nil {
+		return nil, err
+	}
+	return docstore.NewCollection(c), nil
+}
+
+// newCollectionFromURL returns the collection of the URL. The revision_field of the URL only applies to this
+// collection: it is set on a copy of the options of the opener, which may open other collections concurrently.
+func (o *URLOpener) newCollectionFromURL(u *url.URL) (*collection, error) {
 	q := u.Query()
 	idField := q.Get("id_field")
 	q.Del("id_field")
-	o.Options.RevisionField = q.Get("revision_field")
+	opts := o.Options
+	if revisionField := q.Get("revision_field"); revisionField != "" {
+		opts.RevisionField = revisionField
+	}
 	q.Del("revision_field")
 
 	for param := range q {
@@ -110,5 +123,5 @@ func (o *URLOpener) OpenCollectionURL(ctx context.Context, u *url.URL) (*docstor
 	if collName == "" {
 		return nil, fmt.Errorf("open collection %s: URL must have a non-empty Path (collection name)", u)
 	}
-	return OpenCollection(o.Client.Database(dbName).Collection(collName), idField, &o.Options)
+	return newCollection(o.Client.Database(dbName).Collection(collName), idField, nil, &opts)
 }
