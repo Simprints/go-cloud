@@ -62,7 +62,9 @@ package mongodocstore // import "gocloud.dev/docstore/mongodocstore"
 
 import (
 	"context"
+	"errors"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/wire"
@@ -457,6 +459,7 @@ func (c *collection) bulkWrite(ctx context.Context, actions []*driver.Action, er
 		modelActions    []*driver.Action // corresponding action for each model
 		newIDs          []interface{}    // new IDs for Create actions, corresponding to models slice
 		revs            []string         // new revisions, corresponding to models slice
+		singles         []singleWrite    // writes run one by one, see mayNotApply
 		nDeletes        int64
 		nNonCreateWrite int64 // total operations expected from Put, Replace and Update
 	)
@@ -489,22 +492,31 @@ func (c *collection) bulkWrite(ctx context.Context, actions []*driver.Action, er
 		if err != nil {
 			errs[a.Index] = err
 		} else if m != nil { // m can be nil for a no-op update
+			if mayNotApply(m) {
+				singles = append(singles, singleWrite{model: m, action: a, rev: rev})
+				nNonCreateWrite--
+				continue
+			}
 			models = append(models, m)
 			modelActions = append(modelActions, a)
 			newIDs = append(newIDs, newID)
 			revs = append(revs, rev)
 		}
 	}
-	if len(models) == 0 {
+	if len(models) == 0 && len(singles) == 0 {
 		return nil
 	}
 
 	bopts := options.BulkWrite().SetOrdered(false)
 	if dopts.BeforeDo != nil {
+		allModels := slices.Clone(models)
+		for _, sw := range singles {
+			allModels = append(allModels, sw.model)
+		}
 		asFunc := func(target interface{}) bool {
 			switch t := target.(type) {
 			case *[]mongo.WriteModel:
-				*t = models
+				*t = allModels
 			case **options.BulkWriteOptions:
 				*t = bopts
 			default:
@@ -515,6 +527,13 @@ func (c *collection) bulkWrite(ctx context.Context, actions []*driver.Action, er
 		if err := dopts.BeforeDo(asFunc); err != nil {
 			return []error{err}
 		}
+	}
+
+	// The result of a bulk write only counts the writes that applied, so the writes that may not apply run one by
+	// one, to give each its own error: FailedPrecondition for a stale revision, NotFound for a missing document.
+	c.runSingleWrites(ctx, singles, errs)
+	if len(models) == 0 {
+		return nil
 	}
 
 	// TODO(jba): improve independent execution. I think that even if BulkWrite returns an error,
@@ -561,6 +580,89 @@ func (c *collection) bulkWrite(ctx context.Context, actions []*driver.Action, er
 		reterrs = append(reterrs, gcerr.Newf(gcerr.NotFound, nil, "some writes failed (replaced %d, upserted %d, out of total %d)", res.MatchedCount, res.UpsertedCount, nNonCreateWrite))
 	}
 	return reterrs
+}
+
+// singleWrite is a write run on its own rather than in a bulk write, with its action and the new revision it writes.
+type singleWrite struct {
+	model  mongo.WriteModel
+	action *driver.Action
+	rev    string
+}
+
+// mayNotApply reports whether a write may match no document: a Replace or an Update, which need the document to exist,
+// and any write with a revision, which needs it to match.
+func mayNotApply(m mongo.WriteModel) bool {
+	switch m := m.(type) {
+	case *mongo.ReplaceOneModel:
+		return m.Upsert == nil || !*m.Upsert || len(m.Filter.(bson.D)) > 1
+	case *mongo.UpdateOneModel:
+		return true
+	default:
+		return false
+	}
+}
+
+// runSingleWrites runs each write on its own, and sets the error of its action when it fails, or else the new revision
+// of its document.
+func (c *collection) runSingleWrites(ctx context.Context, singles []singleWrite, errs []error) {
+	for _, sw := range singles {
+		var (
+			res    *mongo.UpdateResult
+			err    error
+			filter bson.D
+		)
+		switch m := sw.model.(type) {
+		case *mongo.ReplaceOneModel:
+			filter = m.Filter.(bson.D)
+			upsert := m.Upsert != nil && *m.Upsert
+			res, err = c.coll.ReplaceOne(ctx, filter, m.Replacement, options.Replace().SetUpsert(upsert))
+		case *mongo.UpdateOneModel:
+			filter = m.Filter.(bson.D)
+			res, err = c.coll.UpdateOne(ctx, filter, m.Update)
+		}
+		a := sw.action
+		switch {
+		case err != nil && len(filter) > 1 && isDuplicateKey(err):
+			// An upsert with a stale revision inserts a document with the ID of the existing one.
+			errs[a.Index] = gcerr.Newf(gcerr.FailedPrecondition, err, "wrong revision for document with ID %v", a.Key)
+		case err != nil:
+			errs[a.Index] = err
+		case res.MatchedCount+res.UpsertedCount == 0:
+			errs[a.Index] = c.notAppliedError(ctx, filter, a)
+		case sw.rev != "" && c.hasField(a.Doc, c.revisionField):
+			if err := a.Doc.SetField(c.revisionField, sw.rev); err != nil {
+				errs[a.Index] = err
+			}
+		}
+	}
+}
+
+// notAppliedError returns the error of a write whose filter matched no document: FailedPrecondition when the filter
+// has a revision and the document exists, so its revision is different, and NotFound otherwise.
+func (c *collection) notAppliedError(ctx context.Context, filter bson.D, a *driver.Action) error {
+	if len(filter) > 1 {
+		err := c.coll.FindOne(ctx, filter[:1]).Err()
+		if err == nil {
+			return gcerr.Newf(gcerr.FailedPrecondition, nil, "wrong revision for document with ID %v", a.Key)
+		}
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return err
+		}
+	}
+	return gcerr.Newf(gcerr.NotFound, nil, "document with ID %v not found", a.Key)
+}
+
+// isDuplicateKey reports whether err is a duplicate key error.
+func isDuplicateKey(err error) bool {
+	var we mongo.WriteException
+	if errors.As(err, &we) {
+		for _, e := range we.WriteErrors {
+			if e.Code == mongoDupKeyCode {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs []error, dopts *driver.RunActionsOptions) []error {
@@ -652,6 +754,14 @@ func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs
 		}
 
 		res, err := c.coll.BulkWrite(sessionCtx, models, bopts)
+		if err != nil {
+			_ = session.AbortTransaction(context.Background())
+			if isDuplicateKeyInBulk(err) && hasRevisionedUpsert(models) {
+				// An upsert with a stale revision inserts a document with the ID of the existing one.
+				return gcerr.Newf(gcerr.FailedPrecondition, err, "wrong revision for a document to be put")
+			}
+			return err
+		}
 		if res.DeletedCount != nDeletes {
 			// Some Delete actions failed. It's not an error if a Delete failed because
 			// the document didn't exist, but it is an error if it failed because of a
@@ -663,7 +773,8 @@ func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs
 			}
 		}
 		if res.MatchedCount+res.UpsertedCount != nNonCreateWrite {
-			err = gcerr.Newf(gcerr.NotFound, nil, "some writes failed (replaced %d, upserted %d, out of total %d)", res.MatchedCount, res.UpsertedCount, nNonCreateWrite)
+			// Outside the session, the documents are as before the transaction.
+			err = c.notAppliedTxError(ctx, models, modelActions)
 		}
 		if err != nil {
 			abortTxErr := session.AbortTransaction(context.Background())
@@ -687,6 +798,57 @@ func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs
 		return nil
 	}
 	return nil
+}
+
+// notAppliedTxError returns the error of a transaction in which some writes matched no document: the error of the first
+// Replace or Update whose filter matches no document (see notAppliedError).
+func (c *collection) notAppliedTxError(ctx context.Context, models []mongo.WriteModel, actions []*driver.Action) error {
+	for i, m := range models {
+		var filter bson.D
+		switch m := m.(type) {
+		case *mongo.ReplaceOneModel:
+			if m.Upsert != nil && *m.Upsert && len(m.Filter.(bson.D)) == 1 {
+				continue // a Put without revision always applies
+			}
+			filter = m.Filter.(bson.D)
+		case *mongo.UpdateOneModel:
+			filter = m.Filter.(bson.D)
+		default:
+			continue
+		}
+		err := c.coll.FindOne(ctx, filter).Err()
+		if err == nil {
+			continue // this write applies
+		}
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return err
+		}
+		return c.notAppliedError(ctx, filter, actions[i])
+	}
+	return gcerr.Newf(gcerr.NotFound, nil, "some writes matched no document")
+}
+
+// hasRevisionedUpsert reports whether one of the models is a Put with a revision.
+func hasRevisionedUpsert(models []mongo.WriteModel) bool {
+	for _, m := range models {
+		if m, ok := m.(*mongo.ReplaceOneModel); ok && m.Upsert != nil && *m.Upsert && len(m.Filter.(bson.D)) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// isDuplicateKeyInBulk reports whether err is a bulk write error with a duplicate key error.
+func isDuplicateKeyInBulk(err error) bool {
+	var bwe mongo.BulkWriteException
+	if errors.As(err, &bwe) {
+		for _, e := range bwe.WriteErrors {
+			if e.Code == mongoDupKeyCode {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // determineDeleteErrors find the errors for the delete and return true if found any
