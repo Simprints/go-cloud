@@ -329,15 +329,28 @@ type writer struct {
 }
 
 func (w *writer) Write(p []byte) (n int, err error) {
-	// The error is expected to be returned when writing
-	if w.ifNotExist && len(w.existingDocs) > 0 {
-		err := fmt.Errorf("a blob already exists for key %q", w.key)
-		return 0, gcerr.New(gcerrors.FailedPrecondition, err, 1, "IfNotExist precondition failed")
+	if err := w.checkIfNotExist(); err != nil {
+		return 0, err
 	}
 	return w.w.Write(p)
 }
 
+// checkIfNotExist returns a FailedPrecondition error when the write must only create the blob, and it already exists.
+func (w *writer) checkIfNotExist() error {
+	if w.ifNotExist && len(w.existingDocs) > 0 {
+		err := fmt.Errorf("a blob already exists for key %q", w.key)
+		return gcerr.New(gcerrors.FailedPrecondition, err, 1, "IfNotExist precondition failed")
+	}
+	return nil
+}
+
 func (w *writer) Close() error {
+	// The precondition is checked again here, as Close is called even after Write failed on it, or without any Write
+	// for an empty blob: closing the stream would then store an empty blob, and delete the existing one.
+	if err := w.checkIfNotExist(); err != nil {
+		_ = w.w.Abort()
+		return err
+	}
 	if err := w.w.Close(); err != nil {
 		return err
 	}

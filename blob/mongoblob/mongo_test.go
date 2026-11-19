@@ -1,11 +1,13 @@
 package mongoblob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"gocloud.dev/blob"
 	"gocloud.dev/blob/driver"
 	"gocloud.dev/blob/drivertest"
+	"gocloud.dev/gcerrors"
 	"gocloud.dev/internal/testing/setup"
 )
 
@@ -146,6 +149,58 @@ func TestList(t *testing.T) {
 			}
 			if !slices.Equal(got, tc.want) {
 				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestWriteIfNotExist checks that a write refused because the blob already exists leaves the existing blob untouched,
+// whether the refused content is written or not, and whatever its size and content type.
+func TestWriteIfNotExist(t *testing.T) {
+	client := newTestClient(t, serverURIV4)
+	defer client.Disconnect(context.Background())
+	ctx := context.Background()
+
+	db := client.Database(fmt.Sprintf("%s-ifnotexist-%d", dbName, time.Now().UnixNano()))
+	defer func() { _ = db.Drop(context.Background()) }()
+	b, err := OpenBucket(db.GridFSBucket(options.GridFSBucket().SetName(bucketName1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+
+	tests := map[string]struct {
+		content     []byte
+		contentType string
+	}{
+		"small content with a content type":  {content: []byte("new"), contentType: "text/plain"},
+		"small content without content type": {content: []byte("new")},
+		"large content without content type": {content: bytes.Repeat([]byte("n"), 1024)},
+		"no content with a content type":     {contentType: "text/plain"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			key := "key-" + strings.ReplaceAll(name, " ", "-")
+			if err := b.WriteAll(ctx, key, []byte("existing"), nil); err != nil {
+				t.Fatalf("writing the existing blob: %v", err)
+			}
+
+			w, err := b.NewWriter(ctx, key, &blob.WriterOptions{IfNotExist: true, ContentType: tc.contentType})
+			if err != nil {
+				t.Fatalf("opening the writer: %v", err)
+			}
+			_, writeErr := w.Write(tc.content)
+			closeErr := w.Close()
+			if gcerrors.Code(writeErr) != gcerrors.FailedPrecondition && gcerrors.Code(closeErr) != gcerrors.FailedPrecondition {
+				t.Errorf("got the errors %v (Write) and %v (Close), want FailedPrecondition", writeErr, closeErr)
+			}
+
+			got, err := b.ReadAll(ctx, key)
+			if err != nil {
+				t.Fatalf("reading the existing blob: %v", err)
+			}
+			if string(got) != "existing" {
+				t.Errorf("got the content %q, want the existing blob kept", got)
 			}
 		})
 	}
