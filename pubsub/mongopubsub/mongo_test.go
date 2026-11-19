@@ -44,7 +44,7 @@ func (h *harness) MakeNonexistentTopic(context.Context) (driver.Topic, error) {
 func (h *harness) CreateSubscription(ctx context.Context, dt driver.Topic, testName string) (ds driver.Subscription, cleanup func(), err error) {
 	t := dt.(*topic)
 	subName := fmt.Sprintf("%s-subscription-%d", testName, atomic.AddUint32(&h.numSubs, 1))
-	sub, err := newSubscription(ctx, h.db, t.name, subName, time.Minute)
+	sub, err := newSubscription(ctx, h.db, t.name, subName, &SubscriptionOptions{AckDeadline: time.Minute})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,7 +52,7 @@ func (h *harness) CreateSubscription(ctx context.Context, dt driver.Topic, testN
 }
 
 func (h *harness) MakeNonexistentSubscription(ctx context.Context) (ds driver.Subscription, cleanup func(), err error) {
-	sub, err := newSubscription(ctx, nil, "", "", 1)
+	sub, err := newSubscription(ctx, nil, "", "", &SubscriptionOptions{AckDeadline: 1})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -199,7 +199,7 @@ func TestStaleNack(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDatabase(t)
 
-	sub, err := newSubscription(ctx, db, "topic", "sub", time.Second)
+	sub, err := newSubscription(ctx, db, "topic", "sub", &SubscriptionOptions{AckDeadline: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,15 +258,15 @@ func TestFanOut(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDatabase(t)
 
-	sub1, err := newSubscription(ctx, db, "topic", "sub1", time.Minute)
+	sub1, err := newSubscription(ctx, db, "topic", "sub1", &SubscriptionOptions{AckDeadline: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
-	sub2, err := newSubscription(ctx, db, "topic", "sub2", time.Minute)
+	sub2, err := newSubscription(ctx, db, "topic", "sub2", &SubscriptionOptions{AckDeadline: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := newSubscription(ctx, db, "other-topic", "sub", time.Minute)
+	other, err := newSubscription(ctx, db, "other-topic", "sub", &SubscriptionOptions{AckDeadline: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}

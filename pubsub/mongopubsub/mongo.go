@@ -20,6 +20,11 @@
 //   - Receivers lock the messages they receive until the ack deadline. Acked
 //     messages are deleted, nacked messages and messages whose ack deadline
 //     expired are delivered again: delivery is at-least-once.
+//   - A nacked message is delivered again at once, unless the subscription has
+//     a backoff (SubscriptionOptions.MinBackoff, or the minbackoff query
+//     parameter): it is then delivered again after a delay doubling with each
+//     delivery of the message, from the minimum to the maximum backoff, like
+//     the retry policy of Google Cloud Pub/Sub.
 //
 // Several processes, possibly from different services, can publish to the same
 // topics and receive from the same subscriptions concurrently.
@@ -122,9 +127,13 @@ const Scheme = "mongo"
 // See https://docs.mongodb.com/manual/reference/limits/#naming-restrictions for
 // naming restrictions.
 //
-// Query parameters:
-//   - ackdeadline: The ack deadline for OpenSubscription, in time.ParseDuration formats.
-//     Defaults to 5m.
+// Query parameters of the subscriptions, in time.ParseDuration formats:
+//   - ackdeadline: The ack deadline. Defaults to 5m.
+//   - minbackoff: The delay before a nacked message is delivered again the
+//     first time, doubling with each delivery of the message. Defaults to 0: a
+//     nacked message is delivered again at once.
+//   - maxbackoff: The maximum delay before a nacked message is delivered again.
+//     Defaults to 10 times minbackoff. Requires minbackoff.
 type URLOpener struct {
 	// A Client is a MongoDB client that performs operations on the db, must be
 	// non-nil.
@@ -146,14 +155,23 @@ func (o *URLOpener) OpenTopicURL(_ context.Context, u *url.URL) (*pubsub.Topic, 
 func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsub.Subscription, error) {
 	q := u.Query()
 
-	ackDeadline := 5 * time.Minute
-	if s := q.Get("ackdeadline"); s != "" {
-		var err error
-		ackDeadline, err = time.ParseDuration(s)
-		if err != nil {
-			return nil, fmt.Errorf("open subscription %v: invalid ackdeadline %q: %v", u, s, err)
+	opts := SubscriptionOptions{AckDeadline: 5 * time.Minute}
+	for param, dest := range map[string]*time.Duration{
+		"ackdeadline": &opts.AckDeadline,
+		"minbackoff":  &opts.MinBackoff,
+		"maxbackoff":  &opts.MaxBackoff,
+	} {
+		if s := q.Get(param); s != "" {
+			d, err := time.ParseDuration(s)
+			if err != nil {
+				return nil, fmt.Errorf("open subscription %v: invalid %s %q: %v", u, param, s, err)
+			}
+			*dest = d
 		}
-		q.Del("ackdeadline")
+		q.Del(param)
+	}
+	if err := opts.validate(); err != nil {
+		return nil, fmt.Errorf("open subscription %v: %w", u, err)
 	}
 	for param := range q {
 		return nil, fmt.Errorf("open subscription %v: invalid query parameter %q", u, param)
@@ -166,7 +184,7 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
 		return nil, fmt.Errorf("open subscription %s: URL path must be in the format /topic/subscription", u)
 	}
-	return OpenSubscription(ctx, o.Client.Database(dbName), pathSplit[0], pathSplit[1], ackDeadline)
+	return OpenSubscriptionWithOptions(ctx, o.Client.Database(dbName), pathSplit[0], pathSplit[1], &opts)
 }
 
 // Dial returns a new mongoDB client that is connected to the server URI.
@@ -387,9 +405,40 @@ func (t *topic) Close() error {
 type subscription struct {
 	subscription *mongo.Collection
 	ackDeadline  time.Duration
+	minBackoff   time.Duration
+	maxBackoff   time.Duration
 }
 
-func newSubscription(ctx context.Context, db *mongo.Database, topicName, subName string, ackDeadline time.Duration) (*subscription, error) {
+// SubscriptionOptions are the options of a subscription.
+type SubscriptionOptions struct {
+	// AckDeadline is how long a received message stays locked: it is delivered
+	// again if it isn't acked or nacked by then.
+	AckDeadline time.Duration
+	// MinBackoff is the delay before a nacked message is delivered again the
+	// first time. It doubles with each delivery of the message, up to
+	// MaxBackoff. Zero means that a nacked message is delivered again at once.
+	MinBackoff time.Duration
+	// MaxBackoff is the maximum delay before a nacked message is delivered
+	// again. Zero means 10 times MinBackoff.
+	MaxBackoff time.Duration
+}
+
+func (o *SubscriptionOptions) validate() error {
+	switch {
+	case o.MinBackoff < 0 || o.MaxBackoff < 0:
+		return errors.New("the backoff can't be negative")
+	case o.MinBackoff == 0 && o.MaxBackoff > 0:
+		return errors.New("a maximum backoff requires a minimum backoff")
+	case o.MaxBackoff > 0 && o.MaxBackoff < o.MinBackoff:
+		return fmt.Errorf("the maximum backoff %s is less than the minimum backoff %s", o.MaxBackoff, o.MinBackoff)
+	}
+	return nil
+}
+
+func newSubscription(ctx context.Context, db *mongo.Database, topicName, subName string, opts *SubscriptionOptions) (*subscription, error) {
+	if err := opts.validate(); err != nil {
+		return nil, err
+	}
 	if db == nil {
 		return &subscription{}, nil
 	}
@@ -397,14 +446,30 @@ func newSubscription(ctx context.Context, db *mongo.Database, topicName, subName
 	if err != nil {
 		return nil, err
 	}
-	return &subscription{subscription: coll, ackDeadline: ackDeadline}, nil
+	maxBackoff := opts.MaxBackoff
+	if maxBackoff == 0 {
+		maxBackoff = 10 * opts.MinBackoff
+	}
+	return &subscription{
+		subscription: coll,
+		ackDeadline:  opts.AckDeadline,
+		minBackoff:   opts.MinBackoff,
+		maxBackoff:   maxBackoff,
+	}, nil
 }
 
 // OpenSubscription opens the subscription subName of the topic topicName, in db.
 // The subscription is registered if it isn't yet: it receives the messages
 // published to the topic from now on, even while it isn't open.
+// A nacked message is delivered again at once: see OpenSubscriptionWithOptions
+// for a backoff.
 func OpenSubscription(ctx context.Context, db *mongo.Database, topicName, subName string, ackDeadline time.Duration) (*pubsub.Subscription, error) {
-	s, err := newSubscription(ctx, db, topicName, subName, ackDeadline)
+	return OpenSubscriptionWithOptions(ctx, db, topicName, subName, &SubscriptionOptions{AckDeadline: ackDeadline})
+}
+
+// OpenSubscriptionWithOptions is OpenSubscription with options.
+func OpenSubscriptionWithOptions(ctx context.Context, db *mongo.Database, topicName, subName string, opts *SubscriptionOptions) (*pubsub.Subscription, error) {
+	s, err := newSubscription(ctx, db, topicName, subName, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +504,7 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 			LoggableID: msg.ID.Hex(),
 			Body:       msg.Body,
 			Metadata:   md,
-			AckID:      ackID{ID: msg.ID, BatchID: batchID},
+			AckID:      ackID{ID: msg.ID, BatchID: batchID, DeliveryAttempts: msg.DeliveryAttempts},
 			AsFunc:     func(any) bool { return false },
 		}
 	}
@@ -475,7 +540,10 @@ func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages i
 
 	// 2. We lock them, unless another receiver locked them in the meantime.
 	lockFilter := append(bson.D{{"_id", bson.D{{"$in", ids}}}}, available...)
-	lock := bson.D{{"$set", bson.D{{"lockedUntil", now.Add(s.ackDeadline)}, {"batchId", batchID}}}}
+	lock := bson.D{
+		{"$set", bson.D{{"lockedUntil", now.Add(s.ackDeadline)}, {"batchId", batchID}}},
+		{"$inc", bson.D{{"deliveryAttempts", 1}}},
+	}
 	results, err := s.subscription.UpdateMany(ctx, lockFilter, lock)
 	if err != nil {
 		return nil, batchID, err
@@ -500,6 +568,8 @@ func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages i
 type ackID struct {
 	ID      bson.ObjectID
 	BatchID bson.ObjectID
+	// DeliveryAttempts is how many times the message has been delivered, this delivery included.
+	DeliveryAttempts int
 }
 
 func (s *subscription) SendAcks(ctx context.Context, ackIDs []driver.AckID) error {
@@ -521,14 +591,38 @@ func (s *subscription) SendNacks(ctx context.Context, ackIDs []driver.AckID) err
 	// A message is only unlocked if it is still locked by the batch it was
 	// received in, so that a message whose ack deadline expired and that has been
 	// received again isn't unlocked.
-	locks := make(bson.A, len(ackIDs))
-	for i, id := range ackIDs {
+	//
+	// Without backoff, the nacked messages are available again at once. With a
+	// backoff, they stay locked for a delay depending on how many times they have
+	// been delivered: the messages are grouped by this delay.
+	now := time.Now()
+	locksByUntil := map[time.Time]bson.A{}
+	for _, id := range ackIDs {
 		id := id.(ackID)
-		locks[i] = bson.D{{"_id", id.ID}, {"batchId", id.BatchID}}
+		var until time.Time
+		if s.minBackoff > 0 {
+			until = now.Add(s.backoff(id.DeliveryAttempts))
+		}
+		locksByUntil[until] = append(locksByUntil[until], bson.D{{"_id", id.ID}, {"batchId", id.BatchID}})
 	}
-	update := bson.D{{"$set", bson.D{{"lockedUntil", time.Time{}}}}}
-	_, err := s.subscription.UpdateMany(ctx, bson.D{{"$or", locks}}, update)
-	return err
+	for until, locks := range locksByUntil {
+		update := bson.D{{"$set", bson.D{{"lockedUntil", until}}}}
+		if _, err := s.subscription.UpdateMany(ctx, bson.D{{"$or", locks}}, update); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// backoff returns how long a message nacked after its deliveryAttempts-th
+// delivery stays locked: the minimum backoff after the first delivery, doubling
+// with each delivery, up to the maximum backoff.
+func (s *subscription) backoff(deliveryAttempts int) time.Duration {
+	d := s.minBackoff
+	for i := 1; i < deliveryAttempts && d < s.maxBackoff; i++ {
+		d *= 2
+	}
+	return min(d, s.maxBackoff)
 }
 
 func (s *subscription) IsRetryable(err error) bool {
@@ -637,5 +731,8 @@ type message struct {
 	Metadata    map[string]string `bson:"metadata"`
 	PublishTime time.Time         `bson:"publishTime"`
 	LockedUntil time.Time         `bson:"lockedUntil"`
-	BatchID     bson.ObjectID     `bson:"batchId,omitempty"`
+	// DeliveryAttempts is how many times the message has been delivered. The
+	// messages stored before it existed don't have it: they count from 0.
+	DeliveryAttempts int           `bson:"deliveryAttempts,omitempty"`
+	BatchID          bson.ObjectID `bson:"batchId,omitempty"`
 }
