@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -113,9 +114,10 @@ func (b *bucket) Attributes(ctx context.Context, key string) (*driver.Attributes
 }
 
 func (b *bucket) ListPaged(ctx context.Context, opts *driver.ListOptions) (*driver.ListPage, error) {
-	var filter bson.D
+	// The conditions on the file name are in a single document: two "filename" keys in the filter wouldn't both apply.
+	var nameConditions bson.D
 	if opts.Prefix != "" {
-		filter = bson.D{{"filename", bson.D{{"$regex", "^" + strings.ReplaceAll(opts.Prefix, "\\", "\\\\")}}}}
+		nameConditions = append(nameConditions, bson.E{Key: "$regex", Value: "^" + regexp.QuoteMeta(opts.Prefix)})
 	}
 	pageSize := int32(opts.PageSize)
 	if pageSize == 0 {
@@ -125,7 +127,12 @@ func (b *bucket) ListPaged(ctx context.Context, opts *driver.ListOptions) (*driv
 	pageSize++
 
 	if len(opts.PageToken) > 0 {
-		filter = append(filter, bson.E{Key: "filename", Value: bson.D{{"$gt", string(opts.PageToken)}}})
+		nameConditions = append(nameConditions, bson.E{Key: "$gt", Value: string(opts.PageToken)})
+	}
+	// An empty filter rather than a nil one, which the driver can't marshal.
+	filter := bson.D{}
+	if len(nameConditions) > 0 {
+		filter = bson.D{{"filename", nameConditions}}
 	}
 	findOptions := options.GridFSFind().SetSort(bson.D{{"filename", 1}, {"uploadDate", -1}}).SetLimit(pageSize)
 	cursor, err := b.bucket.Find(ctx, filter, findOptions)
