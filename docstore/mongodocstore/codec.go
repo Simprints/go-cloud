@@ -255,6 +255,8 @@ func (d decoder) AsSpecial(v reflect.Value) (bool, interface{}, error) {
 	}
 }
 
+// bsonDateTimeToTime returns the time of a BSON DateTime (milliseconds since the Unix epoch) in UTC, as the other
+// drivers do, rather than in the local time zone of the process.
 func bsonDateTimeToTime(dt primitive.DateTime) time.Time {
-	return time.Unix(int64(dt)/1000, int64(dt)%1000*1e6)
+	return time.UnixMilli(int64(dt)).UTC()
 }
