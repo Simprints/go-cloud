@@ -18,9 +18,10 @@ import "gocloud.dev/internal/mongoerr"
 
 // IsTransient reports whether err, or an error it wraps, is a transient error of MongoDB: a network error of the
 // driver, no server selected in time (e.g. the server is down), or an error of a replica set changing its primary or of
-// a node shutting down. The errors of the context of the operation aren't transient. The Go CDK has no error code for
-// it (gcerrors.Code returns Unknown, as for an unavailable Google Cloud service), so callers use IsTransient to retry
-// or report the error as temporary.
+// a node shutting down. The errors of the context of the operation aren't transient, except a deadline reached while
+// waiting for a server, which the driver reports as a server selection error. The Go CDK has no error code for it
+// (gcerrors.Code returns Unknown, as for an unavailable Google Cloud service), so callers use IsTransient to retry or
+// report the error as temporary.
 func IsTransient(err error) bool {
 	return mongoerr.IsTransient(err)
 }

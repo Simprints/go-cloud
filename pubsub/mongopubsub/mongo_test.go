@@ -11,6 +11,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/topology"
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/internal/testing/setup"
 	"gocloud.dev/pubsub"
@@ -318,6 +319,7 @@ func TestIsRetryable(t *testing.T) {
 		{"network error", mongo.CommandError{Labels: []string{"NetworkError"}}, true},
 		{"duplicate key", mongo.CommandError{Code: 11000}, false},
 		{"wrapped", fmt.Errorf("inserting: %w", mongo.CommandError{Code: 10107}), true},
+		{"server selection timeout", topology.ServerSelectionError{Wrapped: context.DeadlineExceeded}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := isRetryable(tc.err); got != tc.want {

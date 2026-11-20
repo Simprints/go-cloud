@@ -36,7 +36,9 @@ var transientLabels = []string{"NetworkError", "RetryableWriteError", "Transient
 
 // IsTransient reports whether err, or an error it wraps, is transient, so that the operation can be retried: a network
 // error of the driver, no server selected in time (e.g. the server is down), or an error of a replica set changing its
-// primary or of a node shutting down. The errors of the context of the operation aren't transient.
+// primary or of a node shutting down. The errors of the context of the operation aren't transient, except a deadline
+// reached while waiting for a server, which the driver reports as a server selection error that can't be told apart
+// from the server selection timeout.
 func IsTransient(err error) bool {
 	// The operation was cancelled by its caller, possibly while waiting for a server.
 	if err == nil || errors.Is(err, context.Canceled) {

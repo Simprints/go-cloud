@@ -58,6 +58,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
+	"go.mongodb.org/mongo-driver/v2/x/mongo/driver/topology"
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/internal/escape"
 	"gocloud.dev/internal/gcerr"
@@ -660,8 +661,16 @@ func IsTransient(err error) bool {
 }
 
 // isRetryable reports whether err is transient, so that the operation can be retried, typically during a failover of
-// the replica set.
+// the replica set. A server selection error isn't retried, although it's transient: the driver already waited for a
+// server for the server selection timeout, and the Go CDK retries until the context of the operation is done, which,
+// for the acks and the receives in the background, only happens once the subscription is shut down, and shutting it
+// down waits for the pending acks: a shutdown while MongoDB can't be reached would never end, and the receive errors
+// wouldn't be reported.
 func isRetryable(err error) bool {
+	var sse topology.ServerSelectionError
+	if errors.As(err, &sse) {
+		return false
+	}
 	return mongoerr.IsTransient(err)
 }
 
