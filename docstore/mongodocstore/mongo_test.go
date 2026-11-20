@@ -36,7 +36,6 @@ import (
 )
 
 const (
-	serverURIV3     = "mongodb://localhost:27020"
 	serverURIV4     = "mongodb://localhost:27017/?directConnection=true"
 	dbName          = "docstore-test"
 	collectionName1 = "docstore-test-1"
@@ -165,9 +164,9 @@ func (verifyAs) ErrorCheck(c *docstore.Collection, err error) error {
 	return nil
 }
 
+// TestConformance runs the conformance tests against MongoDB 4. Version 2 of the driver doesn't support MongoDB 3
+// (it requires MongoDB 4.4 or later), so the tests no longer run against it.
 func TestConformance(t *testing.T) {
-	// mongo 3 doesn't support atomic writes
-	t.Run("V3", func(t *testing.T) { testConformance(t, serverURIV3, drivertest.NoSupport) })
 	t.Run("V4", func(t *testing.T) { testConformance(t, serverURIV4, drivertest.MultiplePartitions) })
 }
 

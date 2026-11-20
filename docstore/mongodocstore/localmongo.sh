@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Starts two local MongoDB instances (v3 and v4) via Docker listening on two
-# different ports.
+# Starts a local MongoDB v4 instance via Docker. MongoDB v3 isn't supported by
+# version 2 of the MongoDB driver.
 
 # https://coderwall.com/p/fkfaqq/safer-bash-scripts-with-set-euxo-pipefail
 set -euo pipefail
@@ -24,11 +24,5 @@ docker rm -f mongo4 mongosetup &> /dev/null || :
 docker compose -f ./docstore/mongodocstore/docker-compose.yml up --wait &> /dev/null
 sleep 3
 echo "...done. Run \"docker rm -f mongo4 mongosetup\" to clean up the container."
-echo
-
-echo "Starting MongoDB v3 listening on 27020..."
-docker rm -f mongo3 &> /dev/null || :
-docker run -d --name mongo3  -p 27020:27017 mongo:3 &> /dev/null
-echo "...done. Run \"docker rm -f mongo3\" to clean up the container."
 echo
 
