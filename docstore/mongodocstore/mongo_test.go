@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gocloud.dev/docstore"
 	"gocloud.dev/docstore/driver"
 	"gocloud.dev/docstore/drivertest"
@@ -86,12 +86,12 @@ func (h *harness) AtomicWritesKind() drivertest.AtomicWritesSupportKind {
 func (*harness) BeforeDoTypes() []interface{} {
 	return []interface{}{
 		[]mongo.WriteModel{},
-		&options.FindOptions{},
+		&options.FindOptionsBuilder{},
 	}
 }
 
 func (*harness) BeforeQueryTypes() []interface{} {
-	return []interface{}{&options.FindOptions{}, bson.D{}}
+	return []interface{}{&options.FindOptionsBuilder{}, bson.D{}}
 }
 
 func (*harness) RevisionsEqual(rev1, rev2 interface{}) bool {

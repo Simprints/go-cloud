@@ -80,7 +80,6 @@ github.com/go-sql-driver/mysql
 github.com/goccy/go-json
 github.com/golang-jwt/jwt/v5
 github.com/golang/protobuf
-github.com/golang/snappy
 github.com/google/flatbuffers
 github.com/google/go-cmp
 github.com/google/go-replayers/grpcreplay
@@ -115,7 +114,6 @@ github.com/kylelemons/godebug
 github.com/lib/pq
 github.com/mitchellh/go-homedir
 github.com/mitchellh/mapstructure
-github.com/montanaflynn/stats
 github.com/munnerz/goautoneg
 github.com/nats-io/nats.go
 github.com/nats-io/nkeys
@@ -139,7 +137,6 @@ github.com/zeebo/xxh3
 go.etcd.io/etcd/api/v3
 go.etcd.io/etcd/client/pkg/v3
 go.etcd.io/etcd/client/v3
-go.mongodb.org/mongo-driver
 go.mongodb.org/mongo-driver/v2
 go.opencensus.io
 go.opentelemetry.io/auto/sdk

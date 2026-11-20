@@ -52,9 +52,8 @@ func IsTransient(err error) bool {
 		return false
 	}
 	// The labels and codes are found with errors.As, as the Go CDK wraps the errors of the driver in errors with an
-	// Unwrap() []error method, which the helpers of the driver (mongo.IsNetworkError, mongo.IsTimeout) don't follow
-	// with version 1 of the driver. Only errors of the driver match: a network error of another client (e.g. a timeout
-	// of an HTTP client) isn't transient here.
+	// Unwrap() []error method. Only errors of the driver match: a network error of another client (e.g. a timeout of an
+	// HTTP client) isn't transient here.
 	var le mongo.LabeledError
 	if errors.As(err, &le) && slices.ContainsFunc(transientLabels, le.HasErrorLabel) {
 		return true

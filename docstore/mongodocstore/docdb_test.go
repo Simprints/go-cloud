@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gocloud.dev/docstore/drivertest"
 	"gocloud.dev/internal/testing/setup"
 )
@@ -54,12 +54,7 @@ func newDocDBTestClient(t *testing.T) *mongo.Client {
 	if err := o.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	client, err := mongo.NewClient(o)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	err = client.Connect(ctx)
+	client, err := mongo.Connect(o)
 	if err != nil {
 		t.Fatalf("Failed to connect to cluster: %v", err)
 	}

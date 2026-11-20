@@ -20,24 +20,22 @@ import (
 	"io"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gocloud.dev/docstore/driver"
 )
 
 func (c *collection) RunGetQuery(ctx context.Context, q *driver.Query) (driver.DocumentIterator, error) {
 	opts := options.Find()
 	if len(q.FieldPaths) > 0 {
-		opts.Projection = c.projectionDoc(q.FieldPaths)
+		opts.SetProjection(c.projectionDoc(q.FieldPaths))
 	}
 	if q.Offset > 0 {
-		offset := int64(q.Offset)
-		opts.Skip = &offset
+		opts.SetSkip(int64(q.Offset))
 	}
 	if q.Limit > 0 {
-		lim := int64(q.Limit)
-		opts.Limit = &lim
+		opts.SetLimit(int64(q.Limit))
 	}
 	if q.OrderByField != "" {
 		f := q.OrderByField
@@ -50,7 +48,7 @@ func (c *collection) RunGetQuery(ctx context.Context, q *driver.Query) (driver.D
 		} else {
 			dir = -1
 		}
-		opts.Sort = bson.D{{Key: f, Value: dir}}
+		opts.SetSort(bson.D{{Key: f, Value: dir}})
 	}
 
 	filter := bson.D{} // must be a zero-length slice, not nil

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"gocloud.dev/docstore/driver"
 )
 
@@ -29,7 +29,7 @@ import (
 // TODO(jba): Benchmark the double decode to see if it's worth trying to avoid it.
 
 // This code is copied from memdocstore/codec.go, except for special treatment of
-// primitive.Binary.
+// bson.Binary.
 
 func encodeDoc(doc driver.Document, lowercaseFields bool) (map[string]interface{}, error) {
 	e := encoder{lowercaseFields: lowercaseFields}
@@ -64,7 +64,7 @@ func (e *encoder) MapKey(string)         { panic("impossible") }
 
 var (
 	typeOfGoTime   = reflect.TypeOf(time.Time{})
-	typeOfObjectID = reflect.TypeOf(primitive.ObjectID{})
+	typeOfObjectID = reflect.TypeOf(bson.ObjectID{})
 )
 
 func (e *encoder) EncodeSpecial(v reflect.Value) (bool, error) {
@@ -122,7 +122,39 @@ func decodeDoc(m map[string]interface{}, ddoc driver.Document, idField string, l
 		m[idField] = m[mongoIDField]
 		delete(m, mongoIDField)
 	}
+	for k, v := range m {
+		m[k] = documentsToMaps(v)
+	}
 	return ddoc.Decode(decoder{val: m, lowercaseFields: lowercaseFields})
+}
+
+// documentsToMaps returns v with its embedded documents as map[string]interface{}, the type the decoder expects.
+// Version 2 of the driver decodes the documents embedded in a map[string]interface{} as bson.D (or bson.M or
+// map[string]interface{} with the DefaultDocumentM or DefaultDocumentMap BSON options of the client), where version 1
+// decoded them as the type of the map holding them.
+func documentsToMaps(v interface{}) interface{} {
+	switch v := v.(type) {
+	case bson.D:
+		m := make(map[string]interface{}, len(v))
+		for _, e := range v {
+			m[e.Key] = documentsToMaps(e.Value)
+		}
+		return m
+	case bson.M:
+		return documentsToMaps(map[string]interface{}(v))
+	case map[string]interface{}:
+		for k, e := range v {
+			v[k] = documentsToMaps(e)
+		}
+		return v
+	case bson.A:
+		for i, e := range v {
+			v[i] = documentsToMaps(e)
+		}
+		return v
+	default:
+		return v
+	}
 }
 
 type decoder struct {
@@ -173,7 +205,7 @@ func (d decoder) AsBytes() ([]byte, bool) {
 	switch v := d.val.(type) {
 	case []byte:
 		return v, true
-	case primitive.Binary:
+	case bson.Binary:
 		return v.Data, true
 	default:
 		return nil, false
@@ -186,7 +218,7 @@ func (d decoder) AsInterface() (interface{}, error) {
 
 func toGoValue(v interface{}) (interface{}, error) {
 	switch v := v.(type) {
-	case primitive.A:
+	case bson.A:
 		r := make([]interface{}, len(v))
 		for i, e := range v {
 			d, err := toGoValue(e)
@@ -196,9 +228,9 @@ func toGoValue(v interface{}) (interface{}, error) {
 			r[i] = d
 		}
 		return r, nil
-	case primitive.Binary:
+	case bson.Binary:
 		return v.Data, nil
-	case primitive.DateTime:
+	case bson.DateTime:
 		return bsonDateTimeToTime(v), nil
 	case map[string]interface{}:
 		r := map[string]interface{}{}
@@ -216,14 +248,14 @@ func toGoValue(v interface{}) (interface{}, error) {
 }
 
 func (d decoder) ListLen() (int, bool) {
-	if s, ok := d.val.(primitive.A); ok {
+	if s, ok := d.val.(bson.A); ok {
 		return len(s), true
 	}
 	return 0, false
 }
 
 func (d decoder) DecodeList(f func(i int, d2 driver.Decoder) bool) {
-	for i, e := range d.val.(primitive.A) {
+	for i, e := range d.val.(bson.A) {
 		if !f(i, decoder{e, d.lowercaseFields}) {
 			return
 		}
@@ -247,7 +279,7 @@ func (d decoder) DecodeMap(f func(key string, d2 driver.Decoder, exactMatch bool
 
 func (d decoder) AsSpecial(v reflect.Value) (bool, interface{}, error) {
 	switch v := d.val.(type) {
-	case primitive.DateTime:
+	case bson.DateTime:
 		// A DateTime represents milliseconds since the Unix epoch.
 		return true, bsonDateTimeToTime(v), nil
 	default:
@@ -257,6 +289,6 @@ func (d decoder) AsSpecial(v reflect.Value) (bool, interface{}, error) {
 
 // bsonDateTimeToTime returns the time of a BSON DateTime (milliseconds since the Unix epoch) in UTC, as the other
 // drivers do, rather than in the local time zone of the process.
-func bsonDateTimeToTime(dt primitive.DateTime) time.Time {
+func bsonDateTimeToTime(dt bson.DateTime) time.Time {
 	return time.UnixMilli(int64(dt)).UTC()
 }

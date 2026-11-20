@@ -31,14 +31,14 @@
 // (These implementation choices are subject to change.)
 // It calls the BeforeDo function once before each call to the underlying driver. The as function passed
 // to the BeforeDo function exposes the following types:
-//   - Gets: *options.FindOptions
-//   - writes: []mongo.WriteModel and *options.BulkWriteOptions
+//   - Gets: *options.FindOptionsBuilder
+//   - writes: []mongo.WriteModel and *options.BulkWriteOptionsBuilder
 //
 // # As
 //
 // mongodocstore exposes the following types for As:
 //   - Collection: *mongo.Collection
-//   - Query.BeforeQuery: *options.FindOptions or bson.D (the filter for Delete and Update queries)
+//   - Query.BeforeQuery: *options.FindOptionsBuilder or bson.D (the filter for Delete and Update queries)
 //   - DocumentIterator: *mongo.Cursor
 //   - Error: mongo.CommandError, mongo.BulkWriteError, mongo.BulkWriteException
 //
@@ -48,17 +48,17 @@
 // nanosecond precision. To save time.Times to MongoDB without loss of precision,
 // save the result of calling UnixNano on the time.
 //
-// The official Go driver for MongoDB, go.mongodb.org/mongo-driver/mongo, lowercases
+// The official Go driver for MongoDB, go.mongodb.org/mongo-driver/v2/mongo, lowercases
 // struct field names; other docstore drivers do not. This means that you have to choose
 // between interoperating with the MongoDB driver and interoperating with other docstore drivers.
 // See Options.LowercaseFields for more information.
 package mongodocstore // import "gocloud.dev/docstore/mongodocstore"
 
 // MongoDB reference manual: https://docs.mongodb.com/manual
-// Client documentation: https://godoc.org/go.mongodb.org/mongo-driver/mongo
+// Client documentation: https://pkg.go.dev/go.mongodb.org/mongo-driver/v2/mongo
 //
 // The client methods accept a document of type interface{},
-// which is marshaled by the go.mongodb.org/mongo-driver/bson package.
+// which is marshaled by the go.mongodb.org/mongo-driver/v2/bson package.
 
 import (
 	"context"
@@ -68,10 +68,9 @@ import (
 	"strings"
 
 	"github.com/google/wire"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gocloud.dev/docstore"
 	"gocloud.dev/docstore/driver"
 	"gocloud.dev/gcerrors"
@@ -79,19 +78,14 @@ import (
 )
 
 // Dial returns a new mongoDB client that is connected to the server URI.
-func Dial(ctx context.Context, uri string) (*mongo.Client, error) {
+//
+// The client connects in the background: ctx isn't used, and is kept for compatibility.
+func Dial(_ context.Context, uri string) (*mongo.Client, error) {
 	opts := options.Client().ApplyURI(uri)
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	client, err := mongo.NewClient(opts)
-	if err != nil {
-		return nil, err
-	}
-	if err := client.Connect(ctx); err != nil {
-		return nil, err
-	}
-	return client, nil
+	return mongo.Connect(opts)
 }
 
 // Set holds Wire providers for this package.
@@ -122,7 +116,7 @@ type Options struct {
 	// field name F will correspond to the MongoDB document field "f", for
 	// instance. Use this to make code that uses this package interoperate with
 	// code that uses the official Go client for MongoDB,
-	// go.mongodb.org/mongo-driver/mongo, which lowercases field names.
+	// go.mongodb.org/mongo-driver/v2/mongo, which lowercases field names.
 	LowercaseFields bool
 	// The name of the field holding the document revision.
 	// Defaults to docstore.DefaultRevisionField.
@@ -252,7 +246,7 @@ func (c *collection) bulkFind(ctx context.Context, gets []*driver.Action, errs [
 
 	opts := options.Find()
 	if len(gets[0].FieldPaths) > 0 {
-		opts.Projection = c.projectionDoc(gets[0].FieldPaths)
+		opts.SetProjection(c.projectionDoc(gets[0].FieldPaths))
 	}
 	ids := bson.A{}
 	idToAction := map[interface{}]*driver.Action{}
@@ -326,7 +320,7 @@ func (c *collection) prepareCreate(a *driver.Action) (mdoc, createdID interface{
 	if id == nil {
 		// Create a unique ID here. (The MongoDB Go client does this for us when calling InsertOne,
 		// but not for BulkWrite.)
-		id = primitive.NewObjectID()
+		id = bson.NewObjectID()
 		createdID = id
 	} else {
 		id, err = encodeValue(id)
@@ -520,7 +514,7 @@ func (c *collection) bulkWrite(ctx context.Context, actions []*driver.Action, er
 			switch t := target.(type) {
 			case *[]mongo.WriteModel:
 				*t = allModels
-			case **options.BulkWriteOptions:
+			case **options.BulkWriteOptionsBuilder:
 				*t = bopts
 			default:
 				return false
@@ -731,7 +725,7 @@ func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs
 			switch t := target.(type) {
 			case *[]mongo.WriteModel:
 				*t = models
-			case **options.BulkWriteOptions:
+			case **options.BulkWriteOptionsBuilder:
 				*t = bopts
 			default:
 				return false
@@ -751,7 +745,7 @@ func (c *collection) txWrite(ctx context.Context, actions []*driver.Action, errs
 	}
 	defer session.EndSession(ctx)
 
-	callback := func(sessionCtx mongo.SessionContext) error {
+	callback := func(sessionCtx context.Context) error {
 		if err := session.StartTransaction(); err != nil {
 			return err
 		}
