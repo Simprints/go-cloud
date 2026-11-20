@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/samber/lo"
@@ -45,6 +47,30 @@ func Dial(uri string) (*mongo.Client, error) {
 
 type bucket struct {
 	bucket *mongo.GridFSBucket
+
+	// firstUploadMu serialises the uploads until one has started (firstUploadDone): the first upload of a
+	// mongo.GridFSBucket creates its indexes and then sets a field of the bucket without synchronisation
+	// (GridFSBucket.checkFirstWrite), so concurrent first uploads were a data race.
+	firstUploadMu   sync.Mutex
+	firstUploadDone atomic.Bool
+}
+
+// startUpload calls start, which starts an upload of the GridFS bucket, serialised with the other uploads until one
+// has started.
+func (b *bucket) startUpload(start func() error) error {
+	if !b.firstUploadDone.Load() {
+		b.firstUploadMu.Lock()
+		if !b.firstUploadDone.Load() {
+			defer b.firstUploadMu.Unlock()
+			if err := start(); err != nil {
+				return err
+			}
+			b.firstUploadDone.Store(true)
+			return nil
+		}
+		b.firstUploadMu.Unlock()
+	}
+	return start()
 }
 
 func newBucket(b *mongo.GridFSBucket) *bucket {
@@ -314,7 +340,11 @@ func (b *bucket) NewTypedWriter(ctx context.Context, key, contentType string, op
 		ModTime:            now,
 		ETag:               fmt.Sprintf("\"%d\"", now.UnixNano()),
 	}
-	stream, err := b.bucket.OpenUploadStream(ctx, key, options.GridFSUpload().SetMetadata(attrs))
+	var stream *mongo.GridFSUploadStream
+	err = b.startUpload(func() (err error) {
+		stream, err = b.bucket.OpenUploadStream(ctx, key, options.GridFSUpload().SetMetadata(attrs))
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -387,10 +417,10 @@ func (b *bucket) Copy(ctx context.Context, dstKey, srcKey string, _ *driver.Copy
 	attrs := docs[0].Metadata
 	attrs.CreateTime = time.Now()
 	attrs.ModTime = time.Now()
-	if _, err := b.bucket.UploadFromStream(ctx, dstKey, d, options.GridFSUpload().SetMetadata(attrs)); err != nil {
+	return b.startUpload(func() error {
+		_, err := b.bucket.UploadFromStream(ctx, dstKey, d, options.GridFSUpload().SetMetadata(attrs))
 		return err
-	}
-	return nil
+	})
 }
 
 func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOptions) error {
