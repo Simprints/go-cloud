@@ -390,6 +390,12 @@ func (w *writer) Close() error {
 		_ = w.w.Abort()
 		return err
 	}
+	// Cancelling the context of the writer is how the Go CDK aborts a write: closing the stream would fail, leaving the
+	// chunks already inserted without a file.
+	if err := w.ctx.Err(); err != nil {
+		w.abort()
+		return err
+	}
 	if err := w.w.Close(); err != nil {
 		return err
 	}
@@ -400,6 +406,22 @@ func (w *writer) Close() error {
 		}
 	}
 	return nil
+}
+
+// abortTimeout is the time given to delete the chunks of an aborted upload.
+const abortTimeout = 30 * time.Second
+
+// abort aborts the upload stream, deleting the chunks it already inserted (one series per 16 MiB written). It does what
+// GridFSUploadStream.Abort does, with a context that isn't cancelled: Abort deletes the chunks with the context of the
+// stream, the one cancelled to abort the write, so they stayed.
+func (w *writer) abort() {
+	// Abort releases the resources of the stream; its deletion of the chunks fails with the cancelled context.
+	_ = w.w.Abort()
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(w.ctx), abortTimeout)
+	defer cancel()
+	if _, err := w.b.bucket.GetChunksCollection().DeleteMany(ctx, bson.D{{Key: "files_id", Value: w.w.FileID}}); err != nil {
+		log.Printf("failed to delete the chunks of the aborted upload of blob %q: %v", w.key, err)
+	}
 }
 
 func (b *bucket) Copy(ctx context.Context, dstKey, srcKey string, _ *driver.CopyOptions) error {

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gocloud.dev/blob"
@@ -203,5 +204,93 @@ func TestWriteIfNotExist(t *testing.T) {
 				t.Errorf("got the content %q, want the existing blob kept", got)
 			}
 		})
+	}
+}
+
+// TestWriteCancelled checks that a write aborted by cancelling its context stores no blob, keeps the existing one and
+// leaves no chunk without a file, also for a body over the 16 MiB the upload stream buffers before inserting chunks.
+func TestWriteCancelled(t *testing.T) {
+	client := newTestClient(t, serverURIV4)
+	defer func() { _ = client.Disconnect(context.Background()) }()
+	ctx := context.Background()
+
+	db := client.Database(fmt.Sprintf("%s-cancelled-%d", dbName, time.Now().UnixNano()))
+	defer func() { _ = db.Drop(context.Background()) }()
+	b, err := OpenBucket(db.GridFSBucket(options.GridFSBucket().SetName(bucketName1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close() }()
+
+	tests := map[string]struct {
+		size     int
+		existing bool
+	}{
+		"small body":                      {size: 1024},
+		"body over 16 MiB":                {size: 17 << 20},
+		"body over 16 MiB with a blob":    {size: 17 << 20, existing: true},
+		"small body with a blob":          {size: 1024, existing: true},
+		"body over 32 MiB without a blob": {size: 33 << 20},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			key := "key-" + strings.ReplaceAll(name, " ", "-")
+			if tc.existing {
+				if err := b.WriteAll(ctx, key, []byte("existing"), nil); err != nil {
+					t.Fatalf("writing the existing blob: %v", err)
+				}
+			}
+
+			writeCtx, cancel := context.WithCancel(ctx)
+			w, err := b.NewWriter(writeCtx, key, nil)
+			if err != nil {
+				t.Fatalf("opening the writer: %v", err)
+			}
+			if _, err := w.Write(bytes.Repeat([]byte("n"), tc.size)); err != nil {
+				t.Fatalf("writing: %v", err)
+			}
+			cancel()
+			if err := w.Close(); err == nil {
+				t.Error("got no error closing the cancelled writer")
+			}
+
+			got, err := b.ReadAll(ctx, key)
+			switch {
+			case tc.existing && err != nil:
+				t.Fatalf("reading the existing blob: %v", err)
+			case tc.existing && string(got) != "existing":
+				t.Errorf("got the content %q, want the existing blob kept", got)
+			case !tc.existing && gcerrors.Code(err) != gcerrors.NotFound:
+				t.Errorf("got the error %v reading the blob, want NotFound", err)
+			}
+			assertNoOrphanChunks(t, db)
+		})
+	}
+}
+
+// assertNoOrphanChunks fails the test when the bucket has chunks of no file.
+func assertNoOrphanChunks(t *testing.T, db *mongo.Database) {
+	t.Helper()
+	ctx := context.Background()
+	cursor, err := db.Collection(bucketName1+".files").Find(ctx, bson.D{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []struct {
+		ID any `bson:"_id"`
+	}
+	if err := cursor.All(ctx, &files); err != nil {
+		t.Fatal(err)
+	}
+	fileIDs := bson.A{}
+	for _, f := range files {
+		fileIDs = append(fileIDs, f.ID)
+	}
+	n, err := db.Collection(bucketName1+".chunks").CountDocuments(ctx, bson.D{{Key: "files_id", Value: bson.D{{Key: "$nin", Value: fileIDs}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n > 0 {
+		t.Errorf("got %d chunks without a file, want none", n)
 	}
 }
