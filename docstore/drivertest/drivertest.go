@@ -24,6 +24,7 @@ import (
 	"maps"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -1287,7 +1288,6 @@ type HighScore struct {
 	Score            int
 	Time             time.Time
 	WithGlitch       bool
-	GameCategories   []string
 	DocstoreRevision any
 }
 
@@ -1331,21 +1331,15 @@ const (
 	game3 = "Days Gone"
 )
 
-var (
-	game1Category = []string{"Action", "Adventure"}
-	game2Category = []string{"Horror", "Comedy"}
-	game3Category = []string{"Action", "Adventure", "Horror"}
-)
-
 var highScores = []*HighScore{
-	{game1, "pat", 49, date(3, 13), false, game1Category, nil},
-	{game1, "mel", 60, date(4, 10), false, game1Category, nil},
-	{game1, "andy", 81, date(2, 1), false, game1Category, nil},
-	{game1, "fran", 33, date(3, 19), false, game1Category, nil},
-	{game2, "pat", 120, date(4, 1), true, game2Category, nil},
-	{game2, "billie", 111, date(4, 10), false, game2Category, nil},
-	{game2, "mel", 190, date(4, 18), true, game2Category, nil},
-	{game2, "fran", 33, date(3, 20), false, game2Category, nil},
+	{game1, "pat", 49, date(3, 13), false, nil},
+	{game1, "mel", 60, date(4, 10), false, nil},
+	{game1, "andy", 81, date(2, 1), false, nil},
+	{game1, "fran", 33, date(3, 19), false, nil},
+	{game2, "pat", 120, date(4, 1), true, nil},
+	{game2, "billie", 111, date(4, 10), false, nil},
+	{game2, "mel", 190, date(4, 18), true, nil},
+	{game2, "fran", 33, date(3, 20), false, nil},
 }
 
 func addHighScores(t *testing.T, coll *docstore.Collection) {
@@ -1523,11 +1517,6 @@ func testGetQuery(t *testing.T, _ Harness, coll *docstore.Collection) {
 			want: func(h *HighScore) bool { return !h.WithGlitch },
 		},
 		{
-			name: "GameCategories",
-			q:    coll.Query().Where("GameCategories", "array-contains", game1Category[0]),
-			want: func(h *HighScore) bool { return arrayContains(h.GameCategories, game1Category[0]) },
-		},
-		{
 			name:   "AllByPlayerAsc",
 			q:      coll.Query().OrderBy("Player", docstore.Ascending),
 			want:   func(h *HighScore) bool { return true },
@@ -1565,14 +1554,13 @@ func testGetQuery(t *testing.T, _ Harness, coll *docstore.Collection) {
 				h.Score = 0
 				h.Time = time.Time{}
 				h.WithGlitch = false
-				h.GameCategories = nil
 				return true
 			},
 		},
 		{
 			name:   "AllWithScore",
 			q:      coll.Query(),
-			fields: []docstore.FieldPath{"Game", "Player", "Score", "WithGlitch", "GameCategories", docstore.FieldPath(docstore.DefaultRevisionField)},
+			fields: []docstore.FieldPath{"Game", "Player", "Score", "WithGlitch", docstore.FieldPath(docstore.DefaultRevisionField)},
 			want: func(h *HighScore) bool {
 				h.Time = time.Time{}
 				return true
@@ -2498,7 +2486,7 @@ func testAs(t *testing.T, coll *docstore.Collection, st AsTest) {
 	}
 
 	// ErrorCheck
-	doc := &HighScore{game3, "steph", 24, date(4, 25), false, game3Category, nil}
+	doc := &HighScore{game3, "steph", 24, date(4, 25), false, nil}
 	if err := coll.Create(ctx, doc); err != nil {
 		t.Fatal(err)
 	}
@@ -2536,11 +2524,55 @@ func checkCode(t *testing.T, err error, code gcerrors.ErrorCode) {
 	}
 }
 
-func arrayContains[T comparable](a []T, x T) bool {
-	for _, e := range a {
-		if e == x {
-			return true
+// RunArrayContainsTests runs the conformance tests of the "array-contains" filter, for the drivers supporting it.
+// They are kept out of RunConformanceTests so that the drivers whose tests replay recorded requests (e.g.
+// gcpfirestore) keep matching their recordings, until these are recorded again with them.
+func RunArrayContainsTests(t *testing.T, newHarness HarnessMaker) {
+	t.Run("GetQueryArrayContains", func(t *testing.T) { withCollection(t, newHarness, TwoKey, testGetQueryArrayContains) })
+}
+
+// testGetQueryArrayContains checks the "array-contains" filter.
+func testGetQueryArrayContains(t *testing.T, _ Harness, coll *docstore.Collection) {
+	ctx := context.Background()
+	docs := []map[string]any{
+		{"Game": game1, "Player": "pat", "Categories": []any{"Action", "Adventure"}},
+		{"Game": game2, "Player": "mel", "Categories": []any{"Horror", "Comedy"}},
+		{"Game": game3, "Player": "andy", "Categories": []any{"Action", "Adventure", "Horror"}},
+		{"Game": game3, "Player": "fran"},
+	}
+	for _, doc := range docs {
+		if err := coll.Put(ctx, doc); err != nil {
+			t.Fatal(err)
 		}
 	}
-	return false
+	for _, tc := range []struct {
+		value string
+		want  []string // the players of the documents found
+	}{
+		{"Action", []string{"andy", "pat"}},
+		{"Horror", []string{"andy", "mel"}},
+		{"Comedy", []string{"mel"}},
+		{"Puzzle", nil},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			iter := coll.Query().Where("Categories", "array-contains", tc.value).Get(ctx)
+			defer iter.Stop()
+			var got []string
+			for {
+				doc := map[string]any{}
+				err := iter.Next(ctx, doc)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, doc["Player"].(string))
+			}
+			sort.Strings(got)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("players (-want +got):\n%s", diff)
+			}
+		})
+	}
 }

@@ -218,9 +218,9 @@ type Query struct {
 // If the value is a string type, the filter uses UTF-8 string comparison.
 // TODO(#1762): support comparison of other types.
 type Filter struct {
-	FieldPath []string    // the field path to filter
-	Op        string      // the operation, supports `=`, `>`, `>=`, `<`, `<=`, `in`, `not-in`, `array-contains`
-	Value     any // the value to compare using the operation
+	FieldPath []string // the field path to filter
+	Op        string   // the operation, supports `=`, `>`, `>=`, `<`, `<=`, `in`, `not-in`, `array-contains`
+	Value     any      // the value to compare using the operation
 }
 
 func NewFilter(fieldPath []string, op string, value any) Filter {

@@ -63,6 +63,7 @@ func (*harness) Close() {}
 func TestConformance(t *testing.T) {
 	// CodecTester is nil because memdocstore has no native representation.
 	drivertest.RunConformanceTests(t, newHarness, nil, nil)
+	drivertest.RunArrayContainsTests(t, newHarness)
 }
 
 func closeWithErrorCheck(t testing.TB, c io.Closer) {

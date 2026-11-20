@@ -178,6 +178,7 @@ func testConformance(t *testing.T, serverURI string, atomicWritesKind drivertest
 		return &harness{client.Database(dbName), atomicWritesKind}, nil
 	}
 	drivertest.RunConformanceTests(t, newHarness, codecTester{}, []drivertest.AsTest{verifyAs{}})
+	drivertest.RunArrayContainsTests(t, newHarness)
 }
 
 func newTestClient(t *testing.T, serverURI string) *mongo.Client {
