@@ -48,7 +48,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -62,6 +61,7 @@ import (
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/internal/escape"
 	"gocloud.dev/internal/gcerr"
+	"gocloud.dev/internal/mongoerr"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/driver"
 )
@@ -651,40 +651,18 @@ func (s *subscription) Close() error {
 	return nil
 }
 
-// retryableCodes are the codes of the errors returned while the replica set
-// changes its primary, or while a node shuts down.
-var retryableCodes = []int{
-	6,     // HostUnreachable
-	7,     // HostNotFound
-	89,    // NetworkTimeout
-	91,    // ShutdownInProgress
-	189,   // PrimarySteppedDown
-	262,   // ExceededTimeLimit
-	9001,  // SocketException
-	10107, // NotWritablePrimary
-	11600, // InterruptedAtShutdown
-	11602, // InterruptedDueToReplStateChange
-	13435, // NotPrimaryNoSecondaryOk
-	13436, // NotPrimaryOrSecondary
+// IsTransient reports whether err, or an error it wraps, is a transient error of MongoDB: a network error, no server
+// selected in time, or an error of a replica set changing its primary or of a node shutting down. The Go CDK has no
+// error code for it (gcerrors.Code returns Unknown), so callers use IsTransient to retry or report the error as
+// temporary.
+func IsTransient(err error) bool {
+	return mongoerr.IsTransient(err)
 }
 
-// isRetryable reports whether err is transient, so that the operation can be
-// retried, typically during a failover of the replica set.
+// isRetryable reports whether err is transient, so that the operation can be retried, typically during a failover of
+// the replica set.
 func isRetryable(err error) bool {
-	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	if mongo.IsNetworkError(err) {
-		return true
-	}
-	var se mongo.ServerError
-	if !errors.As(err, &se) {
-		return false
-	}
-	if se.HasErrorLabel("RetryableWriteError") || se.HasErrorLabel("TransientTransactionError") {
-		return true
-	}
-	return slices.ContainsFunc(retryableCodes, se.HasErrorCode)
+	return mongoerr.IsTransient(err)
 }
 
 func errorAs(err error, a any) bool {

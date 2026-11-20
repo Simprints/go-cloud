@@ -20,6 +20,7 @@ import (
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/internal/escape"
 	"gocloud.dev/internal/gcerr"
+	"gocloud.dev/internal/mongoerr"
 )
 
 const defaultPageSize = 1000
@@ -54,6 +55,14 @@ func newBucket(b *mongo.GridFSBucket) *bucket {
 func OpenBucket(mongoBucket *mongo.GridFSBucket) (*blob.Bucket, error) {
 	b := newBucket(mongoBucket)
 	return blob.NewBucket(b), nil
+}
+
+// IsTransient reports whether err, or an error it wraps, is a transient error of MongoDB: a network error, no server
+// selected in time, or an error of a replica set changing its primary or of a node shutting down. The Go CDK has no
+// error code for it (gcerrors.Code returns Unknown), so callers use IsTransient to retry or report the error as
+// temporary.
+func IsTransient(err error) bool {
+	return mongoerr.IsTransient(err)
 }
 
 func (b *bucket) ErrorCode(err error) gcerrors.ErrorCode {
