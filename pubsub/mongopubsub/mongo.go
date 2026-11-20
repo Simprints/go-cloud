@@ -238,7 +238,7 @@ func primary(db *mongo.Database, name string) *mongo.Collection {
 // delivered to it, and returns its collection. It is idempotent.
 func registerSubscription(ctx context.Context, db *mongo.Database, topicName, subName string) (*mongo.Collection, error) {
 	registry := primary(db, subscriptionsCollection)
-	if _, err := registry.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{"topic", 1}}}); err != nil {
+	if _, err := registry.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "topic", Value: 1}}}); err != nil {
 		return nil, fmt.Errorf("creating the index of %s: %w", subscriptionsCollection, err)
 	}
 	// The collection must exist before the first transaction inserts into it:
@@ -248,16 +248,16 @@ func registerSubscription(ctx context.Context, db *mongo.Database, topicName, su
 		return nil, fmt.Errorf("creating the collection %s: %w", collName, err)
 	}
 	coll := primary(db, collName)
-	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{"lockedUntil", 1}}}); err != nil {
+	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "lockedUntil", Value: 1}}}); err != nil {
 		return nil, fmt.Errorf("creating the index of %s: %w", collName, err)
 	}
-	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{"batchId", 1}}}); err != nil {
+	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "batchId", Value: 1}}}); err != nil {
 		return nil, fmt.Errorf("creating the index of %s: %w", collName, err)
 	}
 	// The subscription is registered last, so that publishers only see it once
 	// its collection is ready.
 	id := subscriptionID(topicName, subName)
-	update := bson.D{{"$setOnInsert", subscriptionRegistration{
+	update := bson.D{{Key: "$setOnInsert", Value: subscriptionRegistration{
 		ID:         id,
 		Topic:      topicName,
 		Collection: collName,
@@ -276,7 +276,7 @@ func registerSubscription(ctx context.Context, db *mongo.Database, topicName, su
 // topic aren't delivered to it anymore, unless it is opened again.
 func DeleteSubscription(ctx context.Context, db *mongo.Database, topicName, subName string) error {
 	id := subscriptionID(topicName, subName)
-	if _, err := db.Collection(subscriptionsCollection).DeleteOne(ctx, bson.D{{"_id", id}}); err != nil {
+	if _, err := db.Collection(subscriptionsCollection).DeleteOne(ctx, bson.D{{Key: "_id", Value: id}}); err != nil {
 		return fmt.Errorf("unregistering the subscription %s: %w", id, err)
 	}
 	if err := db.Collection(subscriptionCollectionName(topicName, subName)).Drop(ctx); err != nil {
@@ -348,7 +348,7 @@ func (t *topic) SendBatch(ctx context.Context, ms []*driver.Message) error {
 	// the transaction started, or into none of them. WithTransaction retries the
 	// transient errors, such as a primary election.
 	_, err = session.WithTransaction(ctx, func(ctx context.Context) (any, error) {
-		cursor, err := t.db.Collection(subscriptionsCollection).Find(ctx, bson.D{{"topic", t.name}})
+		cursor, err := t.db.Collection(subscriptionsCollection).Find(ctx, bson.D{{Key: "topic", Value: t.name}})
 		if err != nil {
 			return nil, err
 		}
@@ -517,11 +517,11 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages int) ([]message, bson.ObjectID, error) {
 	now := time.Now()
 	batchID := bson.NewObjectID()
-	available := bson.D{{"lockedUntil", bson.D{{"$lt", now}}}}
+	available := bson.D{{Key: "lockedUntil", Value: bson.D{{Key: "$lt", Value: now}}}}
 
 	// 1. We find the messages that aren't locked.
 	cursor, err := s.subscription.Find(ctx, available,
-		options.Find().SetLimit(int64(maxMessages)).SetProjection(bson.D{{"_id", 1}}))
+		options.Find().SetLimit(int64(maxMessages)).SetProjection(bson.D{{Key: "_id", Value: 1}}))
 	if err != nil {
 		return nil, batchID, err
 	}
@@ -540,10 +540,10 @@ func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages i
 	}
 
 	// 2. We lock them, unless another receiver locked them in the meantime.
-	lockFilter := append(bson.D{{"_id", bson.D{{"$in", ids}}}}, available...)
+	lockFilter := append(bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}}, available...)
 	lock := bson.D{
-		{"$set", bson.D{{"lockedUntil", now.Add(s.ackDeadline)}, {"batchId", batchID}}},
-		{"$inc", bson.D{{"deliveryAttempts", 1}}},
+		{Key: "$set", Value: bson.D{{Key: "lockedUntil", Value: now.Add(s.ackDeadline)}, {Key: "batchId", Value: batchID}}},
+		{Key: "$inc", Value: bson.D{{Key: "deliveryAttempts", Value: 1}}},
 	}
 	results, err := s.subscription.UpdateMany(ctx, lockFilter, lock)
 	if err != nil {
@@ -554,7 +554,7 @@ func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages i
 	}
 
 	// 3. We read the messages that we locked.
-	finalCursor, err := s.subscription.Find(ctx, bson.D{{"batchId", batchID}})
+	finalCursor, err := s.subscription.Find(ctx, bson.D{{Key: "batchId", Value: batchID}})
 	if err != nil {
 		return nil, batchID, err
 	}
@@ -580,7 +580,7 @@ func (s *subscription) SendAcks(ctx context.Context, ackIDs []driver.AckID) erro
 	}
 	// The messages are deleted even if their ack deadline expired, since they
 	// have been processed.
-	_, err := s.subscription.DeleteMany(ctx, bson.D{{"_id", bson.D{{"$in", ids}}}})
+	_, err := s.subscription.DeleteMany(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}})
 	return err
 }
 
@@ -604,11 +604,11 @@ func (s *subscription) SendNacks(ctx context.Context, ackIDs []driver.AckID) err
 		if s.minBackoff > 0 {
 			until = now.Add(s.backoff(id.DeliveryAttempts))
 		}
-		locksByUntil[until] = append(locksByUntil[until], bson.D{{"_id", id.ID}, {"batchId", id.BatchID}})
+		locksByUntil[until] = append(locksByUntil[until], bson.D{{Key: "_id", Value: id.ID}, {Key: "batchId", Value: id.BatchID}})
 	}
 	for until, locks := range locksByUntil {
-		update := bson.D{{"$set", bson.D{{"lockedUntil", until}}}}
-		if _, err := s.subscription.UpdateMany(ctx, bson.D{{"$or", locks}}, update); err != nil {
+		update := bson.D{{Key: "$set", Value: bson.D{{Key: "lockedUntil", Value: until}}}}
+		if _, err := s.subscription.UpdateMany(ctx, bson.D{{Key: "$or", Value: locks}}, update); err != nil {
 			return err
 		}
 	}

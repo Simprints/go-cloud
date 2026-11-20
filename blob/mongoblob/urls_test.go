@@ -25,9 +25,9 @@ import (
 
 func fakeConnectionStringInEnv() func() {
 	oldURLVal := os.Getenv("MONGO_SERVER_URL")
-	os.Setenv("MONGO_SERVER_URL", "mongodb://localhost")
+	_ = os.Setenv("MONGO_SERVER_URL", "mongodb://localhost")
 	return func() {
-		os.Setenv("MONGO_SERVER_URL", oldURLVal)
+		_ = os.Setenv("MONGO_SERVER_URL", oldURLVal)
 	}
 }
 
@@ -51,7 +51,7 @@ func TestOpenBucketURL(t *testing.T) {
 	for _, test := range tests {
 		d, err := blob.OpenBucket(ctx, test.URL)
 		if d != nil {
-			defer d.Close()
+			defer func() { _ = d.Close() }()
 		}
 		if (err != nil) != test.WantErr {
 			t.Errorf("%s: got error %v, want error %v", test.URL, err, test.WantErr)
@@ -62,7 +62,7 @@ func TestOpenBucketURL(t *testing.T) {
 func TestDefaultDialerOpenCollectionURL(t *testing.T) {
 	// Defer cleanup
 	oldURLVal := os.Getenv("MONGO_SERVER_URL")
-	defer os.Setenv("MONGO_SERVER_URL", oldURLVal)
+	defer func() { _ = os.Setenv("MONGO_SERVER_URL", oldURLVal) }()
 
 	tests := []struct {
 		name                  string
@@ -106,14 +106,14 @@ func TestDefaultDialerOpenCollectionURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Set MONGO_SERVER_URL
-			os.Setenv("MONGO_SERVER_URL", test.currentMongoServerURL)
+			_ = os.Setenv("MONGO_SERVER_URL", test.currentMongoServerURL)
 			_, err = d.OpenBucketURL(ctx, u)
 			if err != nil && !test.currentWantErr {
 				t.Error(err)
 			}
 
 			// Update MONGO_SERVER_URL
-			os.Setenv("MONGO_SERVER_URL", test.newMongoServerURL)
+			_ = os.Setenv("MONGO_SERVER_URL", test.newMongoServerURL)
 			_, err = d.OpenBucketURL(ctx, u)
 			if err != nil && !test.newWantErr {
 				t.Error(err)

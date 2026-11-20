@@ -167,9 +167,9 @@ func (b *bucket) ListPaged(ctx context.Context, opts *driver.ListOptions) (*driv
 	// An empty filter rather than a nil one, which the driver can't marshal.
 	filter := bson.D{}
 	if len(nameConditions) > 0 {
-		filter = bson.D{{"filename", nameConditions}}
+		filter = bson.D{{Key: "filename", Value: nameConditions}}
 	}
-	findOptions := options.GridFSFind().SetSort(bson.D{{"filename", 1}, {"uploadDate", -1}}).SetLimit(pageSize)
+	findOptions := options.GridFSFind().SetSort(bson.D{{Key: "filename", Value: 1}, {Key: "uploadDate", Value: -1}}).SetLimit(pageSize)
 	cursor, err := b.bucket.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
@@ -448,7 +448,7 @@ func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOpti
 
 // getDocuments returns all the mongo documents for the specified keys order by upload date descending
 func (b *bucket) getDocuments(ctx context.Context, key string) ([]gridFSFile, error) {
-	cursor, err := b.bucket.Find(ctx, bson.D{{"filename", key}})
+	cursor, err := b.bucket.Find(ctx, bson.D{{Key: "filename", Value: key}})
 	if err != nil {
 		return nil, err
 	}

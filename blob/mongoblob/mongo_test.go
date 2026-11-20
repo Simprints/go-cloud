@@ -58,7 +58,7 @@ func TestConformance(t *testing.T) {
 
 func testConformance(t *testing.T, serverURI string) {
 	client := newTestClient(t, serverURI)
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 
 	newHarness := func(context.Context, *testing.T) (drivertest.Harness, error) {
 		return &harness{client.Database(fmt.Sprintf("%s-%d", dbName, time.Now().UnixNano()))}, nil
@@ -86,7 +86,7 @@ func newTestClient(t *testing.T, serverURI string) *mongo.Client {
 // expression characters, and over several pages with a prefix.
 func TestList(t *testing.T) {
 	client := newTestClient(t, serverURIV4)
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 	ctx := context.Background()
 
 	db := client.Database(fmt.Sprintf("%s-list-%d", dbName, time.Now().UnixNano()))
@@ -95,7 +95,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 
 	keys := []string{"a.b/1", "a.b/2", "a.b/3", "axb/1", "c/1"}
 	for _, key := range keys {
@@ -158,7 +158,7 @@ func TestList(t *testing.T) {
 // whether the refused content is written or not, and whatever its size and content type.
 func TestWriteIfNotExist(t *testing.T) {
 	client := newTestClient(t, serverURIV4)
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 	ctx := context.Background()
 
 	db := client.Database(fmt.Sprintf("%s-ifnotexist-%d", dbName, time.Now().UnixNano()))
@@ -167,7 +167,7 @@ func TestWriteIfNotExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 
 	tests := map[string]struct {
 		content     []byte

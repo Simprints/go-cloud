@@ -22,7 +22,7 @@ func TestIsTransient_ServerDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer bucket.Close()
+	defer func() { _ = bucket.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

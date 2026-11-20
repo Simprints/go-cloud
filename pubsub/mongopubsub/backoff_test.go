@@ -116,7 +116,7 @@ func TestNackBackoff(t *testing.T) {
 		}
 
 		var stored message
-		if err := sub.subscription.FindOne(ctx, bson.D{{"_id", m.AckID.(ackID).ID}}).Decode(&stored); err != nil {
+		if err := sub.subscription.FindOne(ctx, bson.D{{Key: "_id", Value: m.AckID.(ackID).ID}}).Decode(&stored); err != nil {
 			t.Fatal(err)
 		}
 		// MongoDB stores dates to the millisecond.

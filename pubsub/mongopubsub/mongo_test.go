@@ -76,7 +76,7 @@ func (h *harness) SupportsMultipleSubscriptions() bool {
 
 func TestConformance(t *testing.T) {
 	client := newTestClient(t, serverURI)
-	defer client.Disconnect(context.Background())
+	defer func() { _ = client.Disconnect(context.Background()) }()
 
 	newHarness := func(context.Context, *testing.T) (drivertest.Harness, error) {
 		return &harness{db: client.Database(dbName)}, nil
@@ -102,7 +102,7 @@ func TestPublishWhileNoSubscriberIsRunning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer topic.Shutdown(ctx)
+	defer func() { _ = topic.Shutdown(ctx) }()
 	const numMessages = 10
 	for i := range numMessages {
 		if err := topic.Send(ctx, &pubsub.Message{Body: []byte(fmt.Sprint(i))}); err != nil {
@@ -114,7 +114,7 @@ func TestPublishWhileNoSubscriberIsRunning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sub.Shutdown(ctx)
+	defer func() { _ = sub.Shutdown(ctx) }()
 	received := map[string]bool{}
 	for len(received) < numMessages {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -142,13 +142,13 @@ func TestConcurrentReceivers(t *testing.T) {
 		if subs[i], err = OpenSubscription(ctx, db, "topic", "sub", time.Minute); err != nil {
 			t.Fatal(err)
 		}
-		defer subs[i].Shutdown(ctx)
+		defer func() { _ = subs[i].Shutdown(ctx) }()
 	}
 	topic, err := OpenTopic(db, "topic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer topic.Shutdown(ctx)
+	defer func() { _ = topic.Shutdown(ctx) }()
 	const numMessages = 200
 	for i := range numMessages {
 		if err := topic.Send(ctx, &pubsub.Message{Body: []byte(fmt.Sprint(i))}); err != nil {
