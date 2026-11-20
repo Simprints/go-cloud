@@ -365,13 +365,23 @@ type writer struct {
 	ctx          context.Context
 	ifNotExist   bool
 	key          string
+	// writeErr is the first error of Write: the upload stream doesn't roll back a failed flush, so closing it would
+	// store a blob missing a part of its content.
+	writeErr error
 }
 
 func (w *writer) Write(p []byte) (n int, err error) {
 	if err := w.checkIfNotExist(); err != nil {
 		return 0, err
 	}
-	return w.w.Write(p)
+	if w.writeErr != nil {
+		return 0, w.writeErr
+	}
+	n, err = w.w.Write(p)
+	if err != nil {
+		w.writeErr = err
+	}
+	return n, err
 }
 
 // checkIfNotExist returns a FailedPrecondition error when the write must only create the blob, and it already exists.
@@ -396,6 +406,14 @@ func (w *writer) Close() error {
 		w.abort()
 		return err
 	}
+	// After a failed Write (e.g. a network error while flushing 16 MiB), the stream has counted the chunks it failed to
+	// insert: closing it would store a blob with the wrong length and missing chunks, and delete the existing one.
+	if w.writeErr != nil {
+		w.abort()
+		return w.writeErr
+	}
+	// The chunks aren't deleted when closing the stream fails (e.g. a deadline reached while inserting the file
+	// document): the file may have been stored all the same, and deleting its chunks would corrupt it.
 	if err := w.w.Close(); err != nil {
 		return err
 	}

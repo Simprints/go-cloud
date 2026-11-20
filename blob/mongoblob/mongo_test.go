@@ -294,3 +294,71 @@ func assertNoOrphanChunks(t *testing.T, db *mongo.Database) {
 		t.Errorf("got %d chunks without a file, want none", n)
 	}
 }
+
+// TestWriteFailed checks that a write the Go CDK aborts without cancelling its context by the caller stores no blob,
+// keeps the existing one and leaves no chunk without a file: a ContentMD5 mismatch, and a Write whose flush of 16 MiB
+// fails with a transient error (closing the stream would store a blob missing these chunks, and delete the existing
+// one).
+func TestWriteFailed(t *testing.T) {
+	client := newTestClient(t, serverURIV4)
+	defer func() { _ = client.Disconnect(context.Background()) }()
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		opts          *blob.WriterOptions
+		rejectChunks  bool
+		wantWriteFail bool
+	}{
+		"ContentMD5 mismatch": {opts: &blob.WriterOptions{ContentMD5: []byte("0123456789abcdef")}},
+		"failed flush":        {rejectChunks: true, wantWriteFail: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			db := client.Database(fmt.Sprintf("%s-failed-%d", dbName, time.Now().UnixNano()))
+			defer func() { _ = db.Drop(context.Background()) }()
+			b, err := OpenBucket(db.GridFSBucket(options.GridFSBucket().SetName(bucketName1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = b.Close() }()
+			if err := b.WriteAll(ctx, "key", []byte("existing"), nil); err != nil {
+				t.Fatalf("writing the existing blob: %v", err)
+			}
+			if tc.rejectChunks {
+				// Every new chunk is refused: chunk numbers are never negative.
+				cmd := bson.D{{Key: "collMod", Value: bucketName1 + ".chunks"}, {Key: "validator", Value: bson.D{{Key: "n", Value: bson.D{{Key: "$lt", Value: 0}}}}}}
+				if err := db.RunCommand(ctx, cmd).Err(); err != nil {
+					t.Fatalf("adding the validator: %v", err)
+				}
+			}
+
+			w, err := b.NewWriter(ctx, "key", tc.opts)
+			if err != nil {
+				t.Fatalf("opening the writer: %v", err)
+			}
+			_, writeErr := w.Write(bytes.Repeat([]byte("n"), 17<<20))
+			if tc.wantWriteFail && writeErr == nil {
+				t.Fatal("got no error writing, want the flush to fail")
+			}
+			if tc.rejectChunks {
+				// The error was transient: the chunks are accepted again when the writer is closed.
+				cmd := bson.D{{Key: "collMod", Value: bucketName1 + ".chunks"}, {Key: "validator", Value: bson.D{}}}
+				if err := db.RunCommand(ctx, cmd).Err(); err != nil {
+					t.Fatalf("removing the validator: %v", err)
+				}
+			}
+			if err := w.Close(); err == nil {
+				t.Error("got no error closing the failed writer")
+			}
+
+			got, err := b.ReadAll(ctx, "key")
+			if err != nil {
+				t.Fatalf("reading the existing blob: %v", err)
+			}
+			if string(got) != "existing" {
+				t.Errorf("got %d bytes, want the existing blob kept", len(got))
+			}
+			assertNoOrphanChunks(t, db)
+		})
+	}
+}
