@@ -418,7 +418,10 @@ func (w *writer) Close() error {
 		return err
 	}
 	for _, doc := range w.existingDocs {
-		if err := w.b.bucket.Delete(w.ctx, doc.ID); err != nil {
+		// The previous versions are deleted as Delete does, chunks first: an interrupted deletion keeps the document of
+		// the previous version, which reads ignore (they take the newest document) and the next Delete deletes, rather
+		// than leaving its chunks without a file.
+		if err := w.b.deleteFile(w.ctx, doc.ID); err != nil {
 			// We ignore the error as the file has been correctly written
 			log.Printf("failed to delete old blob with id %v: %v", doc.ID, err)
 		}
