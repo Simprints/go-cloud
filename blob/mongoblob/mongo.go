@@ -479,11 +479,22 @@ func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOpti
 		return errNotFound
 	}
 	for _, doc := range docs {
-		if err := b.bucket.Delete(ctx, doc.ID); err != nil {
+		if err := b.deleteFile(ctx, doc.ID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// deleteFile deletes the chunks of the GridFS file, then its document. GridFSBucket.Delete deletes the document
+// first: a deletion interrupted before its chunks are deleted (e.g. by a transient error) would leave them without a
+// file, and a retry would find no blob to delete. Deleting the document last keeps the blob, so that a retry deletes it.
+func (b *bucket) deleteFile(ctx context.Context, id bson.ObjectID) error {
+	if _, err := b.bucket.GetChunksCollection().DeleteMany(ctx, bson.D{{Key: "files_id", Value: id}}); err != nil {
+		return err
+	}
+	_, err := b.bucket.GetFilesCollection().DeleteOne(ctx, bson.D{{Key: "_id", Value: id}})
+	return err
 }
 
 // getDocuments returns all the mongo documents for the specified keys order by upload date descending

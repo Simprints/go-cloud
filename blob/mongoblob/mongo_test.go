@@ -362,3 +362,54 @@ func TestWriteFailed(t *testing.T) {
 		})
 	}
 }
+
+// TestDeleteInterrupted checks that a deletion failing before the chunks of the blob are deleted keeps the blob, so
+// that a retry finds it and deletes it, rather than leaving its chunks without a file. MongoDB refuses to delete from a
+// view, so replacing the chunks collection with a view of it makes their deletion fail.
+func TestDeleteInterrupted(t *testing.T) {
+	client := newTestClient(t, serverURIV4)
+	defer func() { _ = client.Disconnect(context.Background()) }()
+	ctx := context.Background()
+	db := client.Database(fmt.Sprintf("%s-delete-%d", dbName, time.Now().UnixNano()))
+	defer func() { _ = db.Drop(context.Background()) }()
+	b, err := OpenBucket(db.GridFSBucket(options.GridFSBucket().SetName(bucketName1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close() }()
+	if err := b.WriteAll(ctx, "key", []byte("data"), nil); err != nil {
+		t.Fatalf("writing the blob: %v", err)
+	}
+	chunks, aside := bucketName1+".chunks", bucketName1+".chunks-aside"
+	rename := func(from, to string) {
+		t.Helper()
+		cmd := bson.D{{Key: "renameCollection", Value: db.Name() + "." + from}, {Key: "to", Value: db.Name() + "." + to}}
+		if err := client.Database("admin").RunCommand(ctx, cmd).Err(); err != nil {
+			t.Fatalf("renaming %s to %s: %v", from, to, err)
+		}
+	}
+	rename(chunks, aside)
+	if err := db.CreateView(ctx, chunks, aside, mongo.Pipeline{}); err != nil {
+		t.Fatalf("creating the view: %v", err)
+	}
+
+	if err := b.Delete(ctx, "key"); err == nil {
+		t.Fatal("got no error deleting the chunks from a view")
+	}
+
+	// The chunks can be deleted again: the chunks collection replaces the view.
+	if err := db.Collection(chunks).Drop(ctx); err != nil {
+		t.Fatalf("dropping the view: %v", err)
+	}
+	rename(aside, chunks)
+	if exists, err := b.Exists(ctx, "key"); err != nil || !exists {
+		t.Fatalf("Exists after the failed deletion = %v, %v, want the blob kept for the retry", exists, err)
+	}
+	if err := b.Delete(ctx, "key"); err != nil {
+		t.Fatalf("retrying the deletion: %v", err)
+	}
+	if exists, err := b.Exists(ctx, "key"); err != nil || exists {
+		t.Errorf("Exists after the retry = %v, %v, want the blob deleted", exists, err)
+	}
+	assertNoOrphanChunks(t, db)
+}
