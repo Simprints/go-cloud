@@ -320,6 +320,46 @@ func DeleteSubscription(ctx context.Context, db *mongo.Database, topicName, subN
 	return nil
 }
 
+// Subscription describes a subscription registered in a database.
+type Subscription struct {
+	Topic string
+	Name  string
+	// CreatedAt is when the subscription was first opened.
+	CreatedAt time.Time
+	// Messages is an estimate of the number of messages of the subscription not
+	// acked yet, read from the metadata of its collection rather than counted.
+	Messages int64
+	// DeadLetters is the number of dead letters of the subscription.
+	DeadLetters int64
+}
+
+// ListSubscriptions returns the subscriptions registered in db, sorted by topic
+// and name.
+func ListSubscriptions(ctx context.Context, db *mongo.Database) ([]Subscription, error) {
+	cursor, err := primary(db, subscriptionsCollection).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, fmt.Errorf("listing the subscriptions: %w", err)
+	}
+	var registrations []subscriptionRegistration
+	if err := cursor.All(ctx, &registrations); err != nil {
+		return nil, fmt.Errorf("listing the subscriptions: %w", err)
+	}
+	subs := make([]Subscription, len(registrations))
+	for i, r := range registrations {
+		name := strings.TrimPrefix(r.ID, r.Topic+"/")
+		messages, err := primary(db, r.Collection).EstimatedDocumentCount(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("counting the messages of the subscription %s: %w", r.ID, err)
+		}
+		deadLetters, err := CountDeadLetters(ctx, db, r.Topic, name)
+		if err != nil {
+			return nil, err
+		}
+		subs[i] = Subscription{Topic: r.Topic, Name: name, CreatedAt: r.CreatedAt, Messages: messages, DeadLetters: deadLetters}
+	}
+	return subs, nil
+}
+
 func isNamespaceExists(err error) bool {
 	var se mongo.ServerError
 	return errors.As(err, &se) && se.HasErrorCode(48)

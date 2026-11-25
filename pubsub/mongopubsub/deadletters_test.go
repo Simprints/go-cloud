@@ -301,3 +301,42 @@ func deadLetterBodies(letters []DeadLetter) []string {
 	slices.Sort(bodies)
 	return bodies
 }
+
+func TestListSubscriptions(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	for _, name := range []string{"b", "a"} {
+		if _, err := newSubscription(ctx, db, "topic", name, &SubscriptionOptions{AckDeadline: time.Minute}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := newSubscription(ctx, db, "another", "c", &SubscriptionOptions{AckDeadline: time.Minute}); err != nil {
+		t.Fatal(err)
+	}
+	topic, err := OpenTopic(db, "topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = topic.Shutdown(ctx) }()
+	if err := topic.Send(ctx, &pubsub.Message{Body: []byte("m")}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Collection(deadLetterCollectionName("topic", "a")).InsertOne(ctx, bson.D{{Key: "body", Value: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	subs, err := ListSubscriptions(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, s := range subs {
+		got = append(got, fmt.Sprintf("%s/%s:%d:%d", s.Topic, s.Name, s.Messages, s.DeadLetters))
+		if s.CreatedAt.IsZero() {
+			t.Errorf("subscription %s/%s has no creation time", s.Topic, s.Name)
+		}
+	}
+	if want := []string{"another/c:0:0", "topic/a:1:1", "topic/b:1:0"}; !slices.Equal(got, want) {
+		t.Errorf("ListSubscriptions = %v, want %v", got, want)
+	}
+}
