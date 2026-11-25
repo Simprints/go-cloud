@@ -21,6 +21,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"slices"
 	"testing"
 	"time"
 
@@ -331,4 +333,59 @@ func TestLowercaseFields(t *testing.T) {
 	var got9 S
 	must(coll.Query().Where("G", "not-in", []int{50, 51}).OrderBy("G", docstore.Descending).Get(ctx).Next(ctx, &got9))
 	check(got9, *sdoc2)
+}
+
+// TestOrderByIDField checks that a query sorting on the key field of the collection, stored as _id, returns the documents
+// in the order of their keys, as the queries paging by key (Where(key, ">", last).OrderBy(key)) need: they would
+// otherwise skip the documents of a page with a smaller key than its last one.
+func TestOrderByIDField(t *testing.T) {
+	ctx := context.Background()
+	client := newTestClient(t, serverURIV4)
+	defer func() { _ = client.Disconnect(ctx) }()
+	mcoll := client.Database(dbName).Collection("order-by-id-field")
+	_ = mcoll.Drop(ctx)
+	defer func() { _ = mcoll.Drop(ctx) }()
+	dc, err := newCollection(mcoll, "Key", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coll := docstore.NewCollection(dc)
+	defer func() { _ = coll.Close() }()
+
+	// Inserted out of the order of their keys, so that the natural order isn't the expected one.
+	for _, key := range []string{"c", "a", "e", "b", "d"} {
+		if err := coll.Create(ctx, map[string]any{"Key": key, "Group": "g"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, tc := range []struct {
+		ascending bool
+		want      []string
+	}{
+		{ascending: true, want: []string{"b", "c", "d"}},
+		{ascending: false, want: []string{"e", "d", "c"}},
+	} {
+		direction := docstore.Descending
+		if tc.ascending {
+			direction = docstore.Ascending
+		}
+		iter := coll.Query().Where("Key", ">", "a").Where("Group", "=", "g").OrderBy("Key", direction).Limit(3).Get(ctx)
+		var got []string
+		for {
+			doc := map[string]any{}
+			err := iter.Next(ctx, doc)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			got = append(got, doc["Key"].(string))
+		}
+		iter.Stop()
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("keys in %s order = %v, want %v", direction, got, tc.want)
+		}
+	}
 }

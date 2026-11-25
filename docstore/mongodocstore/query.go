@@ -42,6 +42,11 @@ func (c *collection) RunGetQuery(ctx context.Context, q *driver.Query) (driver.D
 		if c.opts.LowercaseFields {
 			f = strings.ToLower(f)
 		}
+		// As in the filters (see filterToBSON): the key field of the documents is stored as _id. Sorting on its name,
+		// which the stored documents don't have, would return them in no particular order.
+		if c.idField != "" && f == c.idField {
+			f = mongoIDField
+		}
 		var dir int
 		if q.OrderAscending {
 			dir = 1
