@@ -25,6 +25,14 @@
 //     parameter): it is then delivered again after a delay doubling with each
 //     delivery of the message, from the minimum to the maximum backoff, like
 //     the retry policy of Google Cloud Pub/Sub.
+//   - A message is retained for delivery for a period after it was published
+//     (SubscriptionOptions.Retention, or the retention query parameter, 24
+//     hours by default). A message still not acked by then, e.g. one that a bug
+//     keeps failing, or one that nothing received in time, is moved to the dead
+//     letters of the subscription, a
+//     collection named "<topic>_<subscription>_deadletters", rather than
+//     delivered again forever: see ListDeadLetters, ReplayDeadLetters and
+//     DeleteDeadLetters.
 //
 // Several processes, possibly from different services, can publish to the same
 // topics and receive from the same subscriptions concurrently.
@@ -46,6 +54,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -135,6 +144,9 @@ const Scheme = "mongo"
 //     nacked message is delivered again at once.
 //   - maxbackoff: The maximum delay before a nacked message is delivered again.
 //     Defaults to 10 times minbackoff. Requires minbackoff.
+//   - retention: How long a message is retained for delivery after it was
+//     published, before it is moved to the dead letters of the subscription.
+//     Defaults to 24h.
 type URLOpener struct {
 	// A Client is a MongoDB client that performs operations on the db, must be
 	// non-nil.
@@ -161,6 +173,7 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 		"ackdeadline": &opts.AckDeadline,
 		"minbackoff":  &opts.MinBackoff,
 		"maxbackoff":  &opts.MaxBackoff,
+		"retention":   &opts.Retention,
 	} {
 		if s := q.Get(param); s != "" {
 			d, err := time.ParseDuration(s)
@@ -227,6 +240,10 @@ func subscriptionCollectionName(topicName, subName string) string {
 	return topicName + "_" + subName
 }
 
+func deadLetterCollectionName(topicName, subName string) string {
+	return subscriptionCollectionName(topicName, subName) + "_deadletters"
+}
+
 // primary returns the collection name of db, always read from the primary,
 // so that receivers never see stale lock states.
 func primary(db *mongo.Database, name string) *mongo.Collection {
@@ -254,6 +271,20 @@ func registerSubscription(ctx context.Context, db *mongo.Database, topicName, su
 	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "batchId", Value: 1}}}); err != nil {
 		return nil, fmt.Errorf("creating the index of %s: %w", collName, err)
 	}
+	// The messages whose retention expired are found by their publish time.
+	if _, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "publishTime", Value: 1}}}); err != nil {
+		return nil, fmt.Errorf("creating the index of %s: %w", collName, err)
+	}
+	// Like the collection of the subscription, the one of its dead letters is
+	// created before any transaction inserts into it.
+	deadLettersName := deadLetterCollectionName(topicName, subName)
+	if err := db.CreateCollection(ctx, deadLettersName); err != nil && !isNamespaceExists(err) {
+		return nil, fmt.Errorf("creating the collection %s: %w", deadLettersName, err)
+	}
+	deadLetters := primary(db, deadLettersName)
+	if _, err := deadLetters.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "deadLetterTime", Value: 1}}}); err != nil {
+		return nil, fmt.Errorf("creating the index of %s: %w", deadLettersName, err)
+	}
 	// The subscription is registered last, so that publishers only see it once
 	// its collection is ready.
 	id := subscriptionID(topicName, subName)
@@ -272,8 +303,9 @@ func registerSubscription(ctx context.Context, db *mongo.Database, topicName, su
 }
 
 // DeleteSubscription unregisters the subscription subName of the topic
-// topicName in db, and deletes its messages. The messages published to the
-// topic aren't delivered to it anymore, unless it is opened again.
+// topicName in db, and deletes its messages and its dead letters. The messages
+// published to the topic aren't delivered to it anymore, unless it is opened
+// again.
 func DeleteSubscription(ctx context.Context, db *mongo.Database, topicName, subName string) error {
 	id := subscriptionID(topicName, subName)
 	if _, err := db.Collection(subscriptionsCollection).DeleteOne(ctx, bson.D{{Key: "_id", Value: id}}); err != nil {
@@ -281,6 +313,9 @@ func DeleteSubscription(ctx context.Context, db *mongo.Database, topicName, subN
 	}
 	if err := db.Collection(subscriptionCollectionName(topicName, subName)).Drop(ctx); err != nil {
 		return fmt.Errorf("dropping the collection of the subscription %s: %w", id, err)
+	}
+	if err := db.Collection(deadLetterCollectionName(topicName, subName)).Drop(ctx); err != nil {
+		return fmt.Errorf("dropping the dead letters of the subscription %s: %w", id, err)
 	}
 	return nil
 }
@@ -404,11 +439,31 @@ func (t *topic) Close() error {
 }
 
 type subscription struct {
+	id           string
 	subscription *mongo.Collection
+	deadLetters  *mongo.Collection
 	ackDeadline  time.Duration
 	minBackoff   time.Duration
 	maxBackoff   time.Duration
+	retention    time.Duration
+
+	// lastDeadLettering is when the expired messages were last moved to the
+	// dead letters, at most every deadLetteringInterval.
+	mu                sync.Mutex
+	lastDeadLettering time.Time
 }
+
+// DefaultRetention is how long a message is retained for delivery after it was
+// published, when the subscription doesn't set a retention.
+const DefaultRetention = 24 * time.Hour
+
+// deadLetteringInterval is how often, at most, a subscription moves the
+// messages whose retention expired to its dead letters, when it receives.
+var deadLetteringInterval = time.Minute
+
+// deadLetteringBatchSize is the maximum number of messages moved to the dead
+// letters, or replayed, in a transaction.
+const deadLetteringBatchSize = 100
 
 // SubscriptionOptions are the options of a subscription.
 type SubscriptionOptions struct {
@@ -422,12 +477,23 @@ type SubscriptionOptions struct {
 	// MaxBackoff is the maximum delay before a nacked message is delivered
 	// again. Zero means 10 times MinBackoff.
 	MaxBackoff time.Duration
+	// Retention is how long a message is retained for delivery after it was
+	// published, whether it was delivered or not: a message still not acked by
+	// then isn't delivered anymore, and is moved to the dead letters of the
+	// subscription once it isn't locked anymore (by a receiver until its ack
+	// deadline, or by the backoff after a nack), within a minute while something
+	// receives from the subscription. A message whose ack deadline passed while
+	// its receiver was still processing it can be moved too, its late ack then
+	// having no effect. Zero means DefaultRetention.
+	Retention time.Duration
 }
 
 func (o *SubscriptionOptions) validate() error {
 	switch {
 	case o.MinBackoff < 0 || o.MaxBackoff < 0:
 		return errors.New("the backoff can't be negative")
+	case o.Retention < 0:
+		return errors.New("the retention can't be negative")
 	case o.MinBackoff == 0 && o.MaxBackoff > 0:
 		return errors.New("a maximum backoff requires a minimum backoff")
 	case o.MaxBackoff > 0 && o.MaxBackoff < o.MinBackoff:
@@ -451,11 +517,18 @@ func newSubscription(ctx context.Context, db *mongo.Database, topicName, subName
 	if maxBackoff == 0 {
 		maxBackoff = 10 * opts.MinBackoff
 	}
+	retention := opts.Retention
+	if retention == 0 {
+		retention = DefaultRetention
+	}
 	return &subscription{
+		id:           subscriptionID(topicName, subName),
 		subscription: coll,
+		deadLetters:  primary(db, deadLetterCollectionName(topicName, subName)),
 		ackDeadline:  opts.AckDeadline,
 		minBackoff:   opts.MinBackoff,
 		maxBackoff:   maxBackoff,
+		retention:    retention,
 	}, nil
 }
 
@@ -483,6 +556,11 @@ const pollInterval = 100 * time.Millisecond
 func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*driver.Message, error) {
 	if s.subscription == nil {
 		return nil, errNotExist
+	}
+	// A failure only delays the dead-lettering, which isn't a reason to stop
+	// delivering the other messages.
+	if err := s.deadLetterExpiredMessages(ctx); err != nil && ctx.Err() == nil {
+		log.Printf("mongopubsub: moving the expired messages of the subscription %s to its dead letters: %v", s.id, err)
 	}
 	msgs, batchID, err := s.fetchAvailableMessages(ctx, maxMessages)
 	if err != nil {
@@ -513,11 +591,17 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 }
 
 // fetchAvailableMessages locks up to maxMessages messages that aren't locked,
-// and returns them with the ID of the batch they were locked in.
+// nor past their retention, and returns them with the ID of the batch they were
+// locked in.
 func (s *subscription) fetchAvailableMessages(ctx context.Context, maxMessages int) ([]message, bson.ObjectID, error) {
 	now := time.Now()
 	batchID := bson.NewObjectID()
-	available := bson.D{{Key: "lockedUntil", Value: bson.D{{Key: "$lt", Value: now}}}}
+	// A message past its retention isn't delivered anymore: left unlocked, it is
+	// moved to the dead letters by the next deadLetterExpiredMessages.
+	available := bson.D{
+		{Key: "lockedUntil", Value: bson.D{{Key: "$lt", Value: now}}},
+		{Key: "publishTime", Value: bson.D{{Key: "$gte", Value: now.Add(-s.retention)}}},
+	}
 
 	// 1. We find the messages that aren't locked.
 	cursor, err := s.subscription.Find(ctx, available,
@@ -722,4 +806,17 @@ type message struct {
 	// messages stored before it existed don't have it: they count from 0.
 	DeliveryAttempts int           `bson:"deliveryAttempts,omitempty"`
 	BatchID          bson.ObjectID `bson:"batchId,omitempty"`
+}
+
+// deadLetterDoc is a message in the dead letters of a subscription: the fields
+// of message, without its lock, and the time it was moved there. (Embedding
+// message, which is unexported, wouldn't decode.)
+type deadLetterDoc struct {
+	ID               bson.ObjectID     `bson:"_id"`
+	Version          int               `bson:"v"`
+	Body             []byte            `bson:"body"`
+	Metadata         map[string]string `bson:"metadata"`
+	PublishTime      time.Time         `bson:"publishTime"`
+	DeliveryAttempts int               `bson:"deliveryAttempts,omitempty"`
+	DeadLetterTime   time.Time         `bson:"deadLetterTime"`
 }
